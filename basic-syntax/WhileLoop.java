@@ -29,5 +29,12 @@ public class WhileLoop {
             }
             dice = dice + 1;
         }
+
+        int sum = 0;
+        for(int i = 1; i <= 6; i++) {
+            sum = sum + i;
+        }
+
+        System.out.println("Sum is : " + sum);
     }
 }

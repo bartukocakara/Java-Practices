@@ -6,6 +6,6 @@ public class VarKeyword {
 
         var x = 5;
 
-        x = 9.99; // Error
+        // x = 9.99; // Error
     }
 }
