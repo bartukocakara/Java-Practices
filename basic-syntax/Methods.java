@@ -11,6 +11,14 @@ public class Methods {
         }
     }
 
+    static int plusMethodInt(int x, int y) {
+        return x + y;
+    }
+
+    static double plusMethodDouble(double x, double y) {
+        return x + y;
+    }
+
     static int getSumPrice(int price1, int price2) {
         int sum = price1 + price2;
         return sum;
@@ -22,7 +30,10 @@ public class Methods {
         checkPrice(sumPrice);
 
         System.out.println("The sum price is : " + sumPrice);
-    }
 
-    
+        int myNum1 = plusMethodInt(5, 6);
+        double myNum2 = plusMethodDouble(sumPrice, myNum1);
+        System.out.println("int: " + myNum1);
+        System.out.println("double: " + myNum2);
+    }
 }
