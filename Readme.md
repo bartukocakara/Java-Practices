@@ -47,3 +47,19 @@ Run these from your `C:\dev\learning` terminal:
 **Compile a file:**
 ```bash
 javac FileName.java
+```
+
+## Debugging Checklist
+* Readthe full error message, it often tells you exactly what's wrong
+* Check if all variables are initialized before use
+* Print variable values to trace the problem
+* Watch for off-by-one errors in loops and arrays
+* Comment out sections of code to find bugs
+
+## File Handling
+* When working with files, streams, or other resources, it is important to close them after use. If you forget to close a resource, it may keep using memory or even prevent you from opening the file again until the program ends.
+* The File class from the java.io package, allows us to work with files.
+* If you are just starting with Java, the easiest way to write text to a file is by using the FileWriter class.In the example below, we use FileWriter together with its write() method to create and write some text into a file.
+
+
+
