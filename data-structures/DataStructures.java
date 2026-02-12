@@ -3,9 +3,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 
-public class DataArrayList {
+public class DataStructures {
     public static void main(String[] args){
 
         //An ArrayList is a resizable array that can grow as needed.
@@ -81,5 +82,32 @@ public class DataArrayList {
         //It works the same way, but some developers prefer this style because it gives them more flexibility to change the type later.
         List<String> carsList = new ArrayList<>();
         var carsExample2 = new ArrayList<String>();
+
+
+        LinkedHashMap<String, String> capitalCities = new LinkedHashMap<>();
+
+        capitalCities.put("England", "London");
+        capitalCities.put("India", "New Delhi");
+
+        System.out.println(capitalCities);
+
+        for(String key : capitalCities.keySet()){
+            System.out.println("Key : " + key + ", Value : " + capitalCities.get(key));
+        }
+
+        ArrayList<Integer> numbers = new ArrayList<Integer>();
+        numbers.add(12);
+        numbers.add(15);
+        numbers.add(2);
+
+        Iterator<Integer> iter = numbers.iterator();
+        while(iter.hasNext()){
+            Integer i = iter.next();
+            if(i < 10) {
+                iter.remove();
+            }
+        }
+
+        System.out.println(numbers);
     }
 }
