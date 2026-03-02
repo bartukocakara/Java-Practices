@@ -1,0 +1,5 @@
+Buy milk and eggs|true
+Finish Java OOP project|false
+Call the bank regarding the loan|false
+Go to the gym|true
+Read the Java Philosophy README|true
