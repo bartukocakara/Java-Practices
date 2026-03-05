@@ -1,4 +1,12 @@
-com\example\Account.class
-com\example\BankingService.class
-com\example\AccountDAO.class
+com\example\service\BankingService.class
+com\example\scheduler\ExchangeRateScheduler.class
+com\example\repository\PostgresAccountRepository.class
+com\example\repository\AccountRepository.class
 com\example\App.class
+com\example\model\Account.class
+com\example\config\DatabaseConfig.class
+com\example\model\ExchangeRate.class
+com\example\service\ExchangeRateService.class
+com\example\config\LoggingConfig.class
+com\example\service\AuthService.class
+com\example\model\User.class

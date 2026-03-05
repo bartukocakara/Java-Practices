@@ -1,4 +1,12 @@
-C:\dev\learning\projects\banking\src\main\java\com\example\BankingService.java
-C:\dev\learning\projects\banking\src\main\java\com\example\AccountDAO.java
-C:\dev\learning\projects\banking\src\main\java\com\example\Account.java
+C:\dev\learning\projects\banking\src\main\java\com\example\model\Account.java
+C:\dev\learning\projects\banking\src\main\java\com\example\model\User.java
+C:\dev\learning\projects\banking\src\main\java\com\example\scheduler\ExchangeRateScheduler.java
 C:\dev\learning\projects\banking\src\main\java\com\example\App.java
+C:\dev\learning\projects\banking\src\main\java\com\example\config\DatabaseConfig.java
+C:\dev\learning\projects\banking\src\main\java\com\example\model\ExchangeRate.java
+C:\dev\learning\projects\banking\src\main\java\com\example\repository\PostgresAccountRepository.java
+C:\dev\learning\projects\banking\src\main\java\com\example\repository\AccountRepository.java
+C:\dev\learning\projects\banking\src\main\java\com\example\service\ExchangeRateService.java
+C:\dev\learning\projects\banking\src\main\java\com\example\config\LoggingConfig.java
+C:\dev\learning\projects\banking\src\main\java\com\example\service\AuthService.java
+C:\dev\learning\projects\banking\src\main\java\com\example\service\BankingService.java
