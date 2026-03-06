@@ -160,7 +160,7 @@ Create a `.env` file in the project root (see [Configuration](#configuration)).
 **4. Build and run**
 
 ```bash
-mvn compile exec:java -Dexec.mainClass="com.example.App"
+mvn compile exec:java
 ```
 
 Or package and run:
