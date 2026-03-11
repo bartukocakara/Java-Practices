@@ -10,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.Page;
+import java.math.BigDecimal;
 
 import java.util.List;
 
@@ -22,8 +24,23 @@ public class ProductController {
     private final ProductService productService;
 
     @GetMapping
-    public ResponseEntity<List<ProductResponse>> getAll() {
-        return ResponseEntity.ok(productService.getAll());
+    public ResponseEntity<Page<ProductResponse>> getAll(
+            @RequestParam(defaultValue = "0")  int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "name") String sortBy,
+            @RequestParam(defaultValue = "asc") String direction) {
+        return ResponseEntity.ok(productService.getAll(page, size, sortBy, direction));
+    }
+
+    @GetMapping("/filter")
+    public ResponseEntity<Page<ProductResponse>> filter(
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) String name,
+            @RequestParam(defaultValue = "0")  int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(productService.filter(categoryId, minPrice, maxPrice, name, page, size));
     }
 
     @GetMapping("/{id}")

@@ -6,8 +6,10 @@ import com.ecommerce.entity.*;
 import com.ecommerce.exception.ResourceNotFoundException;
 import com.ecommerce.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
@@ -17,8 +19,20 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
 
-    public List<ProductResponse> getAll() {
-        return productRepository.findAll().stream().map(this::toResponse).toList();
+    public Page<ProductResponse> getAll(int page, int size, String sortBy, String direction) {
+        Sort sort = direction.equalsIgnoreCase("desc")
+            ? Sort.by(sortBy).descending()
+            : Sort.by(sortBy).ascending();
+        Pageable pageable = PageRequest.of(page, size, sort);
+        return productRepository.findAll(pageable).map(this::toResponse);
+    }
+
+    public Page<ProductResponse> filter(Long categoryId, BigDecimal minPrice,
+                                         BigDecimal maxPrice, String name,
+                                         int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("name").ascending());
+        return productRepository.filter(categoryId, minPrice, maxPrice, name, pageable)
+            .map(this::toResponse);
     }
 
     public ProductResponse getById(Long id) {
@@ -30,7 +44,8 @@ public class ProductService {
     }
 
     public List<ProductResponse> search(String name) {
-        return productRepository.findByNameContainingIgnoreCase(name).stream().map(this::toResponse).toList();
+        return productRepository.findByNameContainingIgnoreCase(name)
+            .stream().map(this::toResponse).toList();
     }
 
     public ProductResponse create(ProductRequest request) {
