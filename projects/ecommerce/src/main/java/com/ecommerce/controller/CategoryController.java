@@ -1,6 +1,7 @@
 package com.ecommerce.controller;
 
 import com.ecommerce.dto.request.CategoryRequest;
+import com.ecommerce.dto.response.CategoryFlatResponse;
 import com.ecommerce.dto.response.CategoryResponse;
 import com.ecommerce.service.CategoryService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -21,21 +22,42 @@ public class CategoryController {
 
     private final CategoryService categoryService;
 
+    // Full nested tree
+    @GetMapping("/tree")
+    public ResponseEntity<List<CategoryResponse>> getTree() {
+        return ResponseEntity.ok(categoryService.getTree());
+    }
+
+    // Flat list of all categories
     @GetMapping
-    public ResponseEntity<List<CategoryResponse>> getAll() {
+    public ResponseEntity<List<CategoryFlatResponse>> getAll() {
         return ResponseEntity.ok(categoryService.getAll());
     }
 
+    // Single category with children
     @GetMapping("/{id}")
     public ResponseEntity<CategoryResponse> getById(@PathVariable Long id) {
         return ResponseEntity.ok(categoryService.getById(id));
+    }
+
+    // Direct children
+    @GetMapping("/{id}/children")
+    public ResponseEntity<List<CategoryResponse>> getChildren(@PathVariable Long id) {
+        return ResponseEntity.ok(categoryService.getChildren(id));
+    }
+
+    // All descendants flat
+    @GetMapping("/{id}/descendants")
+    public ResponseEntity<List<CategoryFlatResponse>> getDescendants(@PathVariable Long id) {
+        return ResponseEntity.ok(categoryService.getDescendants(id));
     }
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     @SecurityRequirement(name = "Bearer Auth")
     public ResponseEntity<CategoryResponse> create(@Valid @RequestBody CategoryRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(categoryService.create(request));
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(categoryService.create(request));
     }
 
     @PutMapping("/{id}")

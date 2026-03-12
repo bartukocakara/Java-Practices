@@ -1,8 +1,10 @@
 package com.ecommerce.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 public record CategoryRequest(
-    @NotBlank String name,
-    String description
+    @NotBlank @Size(max = 100) String name,
+    @Size(max = 255) String description,
+    Long parentId  // null = root category
 ) {}

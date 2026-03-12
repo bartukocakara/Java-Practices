@@ -28,4 +28,19 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
         @Param("name") String name,
         Pageable pageable
     );
+
+    @Query("""
+        SELECT p FROM Product p
+        WHERE (:categoryIds IS NULL OR p.category.id IN :categoryIds)
+        AND (:minPrice IS NULL OR p.price >= :minPrice)
+        AND (:maxPrice IS NULL OR p.price <= :maxPrice)
+        AND (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%')))
+        """)
+    Page<Product> filterWithCategories(
+        @Param("categoryIds") List<Long> categoryIds,
+        @Param("minPrice") BigDecimal minPrice,
+        @Param("maxPrice") BigDecimal maxPrice,
+        @Param("name") String name,
+        Pageable pageable
+    );
 }

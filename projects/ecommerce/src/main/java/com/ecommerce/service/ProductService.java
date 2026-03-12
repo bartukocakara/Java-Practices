@@ -10,6 +10,7 @@ import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -27,12 +28,29 @@ public class ProductService {
         return productRepository.findAll(pageable).map(this::toResponse);
     }
 
+    // In ProductService — update filter method
     public Page<ProductResponse> filter(Long categoryId, BigDecimal minPrice,
-                                         BigDecimal maxPrice, String name,
-                                         int page, int size) {
+                                     BigDecimal maxPrice, String name,
+                                     int page, int size) {
+
+        final List<Long> categoryIds;
+
+        if (categoryId != null) {
+            // Build list first, then assign once — making it effectively final
+            List<Long> ids = new ArrayList<>();
+            ids.add(categoryId);
+            categoryRepository.findAllDescendants(categoryId)
+                .forEach(row -> ids.add(((Number) row[0]).longValue()));
+            categoryIds = ids;
+        } else {
+            categoryIds = null;
+        }
+
         Pageable pageable = PageRequest.of(page, size, Sort.by("name").ascending());
-        return productRepository.filter(categoryId, minPrice, maxPrice, name, pageable)
-            .map(this::toResponse);
+
+        return productRepository.filterWithCategories(
+            categoryIds, minPrice, maxPrice, name, pageable
+        ).map(this::toResponse);
     }
 
     public ProductResponse getById(Long id) {

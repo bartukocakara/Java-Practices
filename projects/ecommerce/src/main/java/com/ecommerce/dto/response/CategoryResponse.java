@@ -1,3 +1,12 @@
 package com.ecommerce.dto.response;
 
-public record CategoryResponse(Long id, String name, String description) {}
+import java.util.List;
+
+public record CategoryResponse(
+    Long id,
+    String name,
+    String description,
+    Long parentId,
+    String parentName,
+    List<CategoryResponse> children  // recursive
+) {}
