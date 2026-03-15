@@ -2,7 +2,6 @@ package com.ecommerce.controller;
 
 import com.ecommerce.dto.request.OrderRequest;
 import com.ecommerce.dto.response.OrderResponse;
-import com.ecommerce.entity.Order;
 import com.ecommerce.service.OrderService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,36 +24,38 @@ public class OrderController {
 
     private final OrderService orderService;
 
-    @GetMapping("/my")
-    public ResponseEntity<List<OrderResponse>> getMyOrders(@AuthenticationPrincipal UserDetails userDetails) {
-        // Fetch user id via username — simplified here, extend as needed
-        return ResponseEntity.ok(orderService.getOrdersByUser(
-            Long.parseLong(userDetails.getUsername())));
+    @PostMapping
+    public ResponseEntity<OrderResponse> create(
+            @AuthenticationPrincipal UserDetails user,
+            @Valid @RequestBody OrderRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(orderService.create(user.getUsername(), request));
+    }
+
+    @GetMapping
+    public ResponseEntity<List<OrderResponse>> getMyOrders(
+            @AuthenticationPrincipal UserDetails user) {
+        return ResponseEntity.ok(orderService.getMyOrders(user.getUsername()));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<OrderResponse> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(orderService.getById(id));
+    public ResponseEntity<OrderResponse> getById(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails user) {
+        return ResponseEntity.ok(orderService.getById(id, user.getUsername()));
     }
 
-    @PostMapping
-    public ResponseEntity<OrderResponse> create(@Valid @RequestBody OrderRequest request,
-                                                 @AuthenticationPrincipal UserDetails userDetails) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-            .body(orderService.create(request, userDetails.getUsername()));
+    @GetMapping("/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<OrderResponse>> getAll() {
+        return ResponseEntity.ok(orderService.getAll());
     }
 
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<OrderResponse> updateStatus(@PathVariable Long id,
-                                                       @RequestParam Order.Status status) {
+    public ResponseEntity<OrderResponse> updateStatus(
+            @PathVariable Long id,
+            @RequestParam String status) {
         return ResponseEntity.ok(orderService.updateStatus(id, status));
-    }
-
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        orderService.delete(id);
-        return ResponseEntity.noContent().build();
     }
 }

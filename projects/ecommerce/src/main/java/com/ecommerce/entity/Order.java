@@ -4,12 +4,21 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
 @Table(name = "orders")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class Order {
+
+    public enum Status {
+        PENDING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED
+    }
+
+    public enum PaymentMethod {
+        CASH_ON_DELIVERY, CREDIT_CARD
+    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -20,23 +29,34 @@ public class Order {
     private User user;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<OrderItem> items;
+    @Builder.Default
+    private List<OrderItem> items = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private Status status;
+    @Builder.Default
+    private Status status = Status.PENDING;
+
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    private PaymentMethod paymentMethod = PaymentMethod.CASH_ON_DELIVERY;
 
     @Column(nullable = false)
     private BigDecimal totalAmount;
+
+    // Shipping info
+    private String fullName;
+    private String phone;
+    private String addressLine;
+    private String city;
+    private String country;
+    private String notes;
 
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-        this.status = Status.PENDING;
+        createdAt = LocalDateTime.now();
+        if (status == null) status = Status.PENDING;
     }
-
-    public enum Status { PENDING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED }
 }

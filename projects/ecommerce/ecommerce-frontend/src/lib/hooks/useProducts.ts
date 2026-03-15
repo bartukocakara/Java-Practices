@@ -1,42 +1,52 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { productApi } from '@/lib/api/products';
+import { productApi, FilterParams } from '@/lib/api/products';
 
 export const PRODUCT_KEYS = {
-  all: ['products'] as const,
-  list: (page: number, size: number) => ['products', 'list', page, size] as const,
-  filter: (params: object) => ['products', 'filter', params] as const,
-  detail: (id: number) => ['products', id] as const,
+  all:     ['products'] as const,
+  lists:   () => ['products', 'list'] as const,
+  list:    (page: number, size: number, sortBy?: string, direction?: string) =>
+             ['products', 'list', page, size, sortBy, direction] as const,
+  filters: () => ['products', 'filter'] as const,
+  filter:  (params: object) => ['products', 'filter', params] as const,
+  details: () => ['products', 'detail'] as const,
+  detail:  (slug: string) => ['products', 'detail', slug] as const,
   reviews: (id: number) => ['products', id, 'reviews'] as const,
 };
 
-export function useProducts(page = 0, size = 12) {
+export function useProducts(
+  page = 0,
+  size = 12,
+  sortBy = 'name',
+  direction = 'asc'
+) {
   return useQuery({
-    queryKey: PRODUCT_KEYS.list(page, size),
-    queryFn: () => productApi.getAll(page, size),
-  });
-}
-
-export function useFilteredProducts(params: Parameters<typeof productApi.filter>[0]) {
-  return useQuery({
-    queryKey: PRODUCT_KEYS.filter(params),
-    queryFn: () => productApi.filter(params),
+    queryKey: PRODUCT_KEYS.list(page, size, sortBy, direction),
+    queryFn:  () => productApi.getAll(page, size, sortBy, direction),
     placeholderData: (prev) => prev,
   });
 }
 
-export function useProduct(id: number) {
+export function useFilteredProducts(params: FilterParams) {
   return useQuery({
-    queryKey: PRODUCT_KEYS.detail(id),
-    queryFn: () => productApi.getById(id),
-    enabled: !!id,
+    queryKey: PRODUCT_KEYS.filter(params),
+    queryFn:  () => productApi.filter(params),
+    placeholderData: (prev) => prev,
+  });
+}
+
+export function useProduct(slug: string) {
+  return useQuery({
+    queryKey: PRODUCT_KEYS.detail(slug),
+    queryFn:  () => productApi.getBySlug(slug),
+    enabled:  !!slug && slug !== 'undefined',
   });
 }
 
 export function useProductReviews(productId: number) {
   return useQuery({
     queryKey: PRODUCT_KEYS.reviews(productId),
-    queryFn: () => productApi.getReviews(productId),
-    enabled: !!productId,
+    queryFn:  () => productApi.getReviews(productId),
+    enabled:  productId > 0,
   });
 }
 
@@ -46,7 +56,37 @@ export function useSubmitReview(productId: number) {
     mutationFn: (data: { rating: number; comment: string }) =>
       productApi.submitReview(productId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: PRODUCT_KEYS.reviews(productId) });
+      // Refresh reviews list for this product
+      queryClient.invalidateQueries({
+        queryKey: PRODUCT_KEYS.reviews(productId),
+      });
+      // Refresh all product details (reviewCount update)
+      queryClient.invalidateQueries({
+        queryKey: PRODUCT_KEYS.details(),  // ← now exists
+      });
+    },
+  });
+}
+
+export function useCreateProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: productApi.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: PRODUCT_KEYS.all });
+    },
+  });
+}
+
+export function useUpdateProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: {
+      id: number;
+      data: Parameters<typeof productApi.update>[1];
+    }) => productApi.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: PRODUCT_KEYS.all });
     },
   });
 }

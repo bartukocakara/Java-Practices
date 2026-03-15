@@ -1,17 +1,27 @@
 import api from './axios';
 import { Order } from '@/types';
 
+export interface CreateOrderRequest {
+  fullName:      string;
+  phone:         string;
+  addressLine:   string;
+  city:          string;
+  country:       string;
+  paymentMethod: string;
+  notes?:        string;
+  items: { productId: number; quantity: number }[];
+}
+
 export const orderApi = {
+  create: (data: CreateOrderRequest) =>
+    api.post<Order>('/api/orders', data).then(r => r.data),
+
   getMyOrders: () =>
     api.get<Order[]>('/api/orders').then(r => r.data),
 
   getById: (id: number) =>
     api.get<Order>(`/api/orders/${id}`).then(r => r.data),
 
-  create: (items: { productId: number; quantity: number }[]) =>
-    api.post<Order>('/api/orders', { items }).then(r => r.data),
-
-  // Admin
   getAll: () =>
     api.get<Order[]>('/api/orders/all').then(r => r.data),
 

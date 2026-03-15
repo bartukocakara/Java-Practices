@@ -30,4 +30,8 @@ public class OrderItem {
 
     @Column(nullable = false)
     private BigDecimal unitPrice; // snapshot at time of order
+
+    // OrderItem.java — add this field
+    @Column(nullable = false)
+    private String productName; // snapshot at time of order
 }

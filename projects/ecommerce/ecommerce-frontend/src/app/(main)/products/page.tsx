@@ -231,11 +231,15 @@ function ProductsContent() {
               </Button>
             </div>
           ) : (
-            <div className={`grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 transition-opacity ${isFetching ? 'opacity-60' : 'opacity-100'}`}>
-              {data?.content.map(product => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
+            <div className={`
+                grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5
+                transition-opacity duration-200
+                ${isFetching ? 'opacity-60' : 'opacity-100'}
+              `}>
+                {data?.content.map(product => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
           )}
 
           {/* Pagination */}

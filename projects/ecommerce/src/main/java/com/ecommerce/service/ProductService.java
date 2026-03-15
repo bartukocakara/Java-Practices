@@ -1,6 +1,7 @@
 package com.ecommerce.service;
 
 import com.ecommerce.dto.request.ProductRequest;
+import com.ecommerce.dto.response.ProductImageResponse;
 import com.ecommerce.dto.response.ProductResponse;
 import com.ecommerce.entity.*;
 import com.ecommerce.exception.ResourceNotFoundException;
@@ -19,7 +20,7 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
-
+    private final SlugService         slugService;
     public Page<ProductResponse> getAll(int page, int size, String sortBy, String direction) {
         Sort sort = direction.equalsIgnoreCase("desc")
             ? Sort.by(sortBy).descending()
@@ -33,23 +34,23 @@ public class ProductService {
                                      BigDecimal maxPrice, String name,
                                      int page, int size) {
 
-        final List<Long> categoryIds;
-
-        if (categoryId != null) {
-            // Build list first, then assign once — making it effectively final
-            List<Long> ids = new ArrayList<>();
-            ids.add(categoryId);
-            categoryRepository.findAllDescendants(categoryId)
-                .forEach(row -> ids.add(((Number) row[0]).longValue()));
-            categoryIds = ids;
-        } else {
-            categoryIds = null;
-        }
-
         Pageable pageable = PageRequest.of(page, size, Sort.by("name").ascending());
 
-        return productRepository.filterWithCategories(
-            categoryIds, minPrice, maxPrice, name, pageable
+        // If no categoryId use the simple filter query
+        if (categoryId == null) {
+            return productRepository.filter(
+                null, minPrice, maxPrice, name, pageable
+            ).map(this::toResponse);
+        }
+
+        // Build category id list including all descendants
+        List<Long> ids = new ArrayList<>();
+        ids.add(categoryId);
+        categoryRepository.findAllDescendants(categoryId)
+            .forEach(row -> ids.add(((Number) row[0]).longValue()));
+
+        return productRepository.filterByCategoryIds(
+            ids, minPrice, maxPrice, name, pageable
         ).map(this::toResponse);
     }
 
@@ -69,26 +70,48 @@ public class ProductService {
     public ProductResponse create(ProductRequest request) {
         Category category = categoryRepository.findById(request.categoryId())
             .orElseThrow(() -> new ResourceNotFoundException("Category", request.categoryId()));
+
         Product product = Product.builder()
             .name(request.name())
             .description(request.description())
             .price(request.price())
             .stock(request.stock())
             .category(category)
+            .averageRating(0.0)
+            .reviewCount(0)
+            .slug("temp") // temporary — will be replaced after ID is assigned
             .build();
-        return toResponse(productRepository.save(product));
+
+        // Save once to get the generated ID
+        Product saved = productRepository.save(product);
+
+        // Now generate slug with real ID — guaranteed unique
+        saved.setSlug(slugService.generateSlug(saved.getName(), saved.getId()));
+
+        return toResponse(productRepository.save(saved));
     }
 
     public ProductResponse update(Long id, ProductRequest request) {
         Product product = findOrThrow(id);
         Category category = categoryRepository.findById(request.categoryId())
             .orElseThrow(() -> new ResourceNotFoundException("Category", request.categoryId()));
+
         product.setName(request.name());
         product.setDescription(request.description());
         product.setPrice(request.price());
         product.setStock(request.stock());
         product.setCategory(category);
+
+        // Regenerate slug when name changes
+        product.setSlug(slugService.regenerateSlug(request.name(), id));
+
         return toResponse(productRepository.save(product));
+    }
+
+    public ProductResponse getBySlug(String slug) {
+        Product product = productRepository.findBySlug(slug)
+            .orElseThrow(() -> new ResourceNotFoundException("Product", 0L));
+        return toResponse(product);
     }
 
     public void delete(Long id) {
@@ -101,8 +124,28 @@ public class ProductService {
     }
 
     private ProductResponse toResponse(Product p) {
-        return new ProductResponse(p.getId(), p.getName(), p.getDescription(),
-            p.getPrice(), p.getStock(),
-            p.getCategory() != null ? p.getCategory().getName() : null);
+        List<ProductImageResponse> images = p.getImages() == null
+            ? List.of()
+            : p.getImages().stream().map(img -> new ProductImageResponse(
+                img.getId(),
+                img.getImageUrl(),
+                img.getIsPrimary(),
+                img.getSortOrder(),
+                img.getCreatedAt()
+            )).toList();
+
+        return new ProductResponse(
+            p.getId(),
+            p.getName(),
+            p.getDescription(),
+            p.getPrice(),
+            p.getStock(),
+            p.getCategory() != null ? p.getCategory().getName() : null,
+            p.getAverageRating(),
+            p.getReviewCount(),
+            p.getPrimaryImageUrl(),
+            images,
+            p.getSlug()
+        );
     }
 }

@@ -40,12 +40,19 @@ public class ProductController {
             @RequestParam(required = false) String name,
             @RequestParam(defaultValue = "0")  int page,
             @RequestParam(defaultValue = "10") int size) {
-        return ResponseEntity.ok(productService.filter(categoryId, minPrice, maxPrice, name, page, size));
+        return ResponseEntity.ok(
+            productService.filter(categoryId, minPrice, maxPrice, name, page, size));
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<ProductResponse> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(productService.getById(id));
+    @GetMapping("/{slugOrId}")
+    public ResponseEntity<ProductResponse> getProduct(@PathVariable String slugOrId) {
+        // If it's a number treat it as ID (backwards compat), otherwise slug
+        try {
+            Long id = Long.parseLong(slugOrId);
+            return ResponseEntity.ok(productService.getById(id));
+        } catch (NumberFormatException e) {
+            return ResponseEntity.ok(productService.getBySlug(slugOrId));
+        }
     }
 
     @GetMapping("/category/{categoryId}")

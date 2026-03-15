@@ -2,7 +2,8 @@ import api from './axios';
 import { Cart } from '@/types';
 
 export const cartApi = {
-  get: () => api.get<Cart>('/api/cart').then(r => r.data),
+  get: () =>
+    api.get<Cart>('/api/cart').then(r => r.data),
 
   addItem: (productId: number, quantity: number) =>
     api.post<Cart>('/api/cart/items', { productId, quantity }).then(r => r.data),
@@ -15,5 +16,6 @@ export const cartApi = {
   removeItem: (cartItemId: number) =>
     api.delete<Cart>(`/api/cart/items/${cartItemId}`).then(r => r.data),
 
-  clear: () => api.delete('/api/cart'),
+  clear: () =>
+    api.delete('/api/cart'),
 };

@@ -25,13 +25,16 @@ export interface Category {
   depth: number;
 }
 
-export interface CategoryTree {
-  id: number;
-  name: string;
-  description: string;
-  parentId: number | null;
-  parentName: string | null;
+export interface CategoryTree extends Category {
   children: CategoryTree[];
+}
+
+export interface ProductImage {
+  id: number;
+  imageUrl: string;
+  isPrimary: boolean;
+  sortOrder: number;
+  createdAt: string;
 }
 
 export interface Product {
@@ -40,9 +43,12 @@ export interface Product {
   description: string;
   price: number;
   stock: number;
-  categoryName: string;
-  averageRating?: number;
-  reviewCount?: number;
+  categoryName: string | null;
+  averageRating: number;
+  reviewCount: number;
+  primaryImageUrl: string | null;
+  images: ProductImage[];
+  slug: string;
 }
 
 export interface PageResponse<T> {
@@ -70,20 +76,30 @@ export interface Cart {
   totalAmount: number;
 }
 
+export type PaymentMethod = 'CASH_ON_DELIVERY' | 'CREDIT_CARD';
+
 export interface OrderItemResponse {
   id: number;
   productId: number;
   productName: string;
   quantity: number;
   unitPrice: number;
+  subtotal: number;
 }
 
 export interface Order {
   id: number;
   status: OrderStatus;
+  paymentMethod: PaymentMethod;
   totalAmount: number;
-  createdAt: string;
+  fullName: string;
+  phone: string;
+  addressLine: string;
+  city: string;
+  country: string;
+  notes?: string;
   items: OrderItemResponse[];
+  createdAt: string;
 }
 
 export interface Review {

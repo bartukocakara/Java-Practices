@@ -26,24 +26,25 @@ public class SecurityConfig {
     private final JwtAuthFilter jwtAuthFilter;
     private final UserDetailsServiceImpl userDetailsService;
 
-    // ← Higher priority chain — handles public paths with NO security at all
     @Bean
     @Order(1)
     public SecurityFilterChain publicFilterChain(HttpSecurity http) throws Exception {
         return http
             .securityMatcher(
                 "/api/auth/**",
+                "/api/images/**",        // ← was missing here
                 "/v3/api-docs",
                 "/v3/api-docs/**",
-                "/api-docs",          // ← add
-                "/api-docs/**",       // ← add
+                "/api-docs",
+                "/api-docs/**",
                 "/swagger-ui",
                 "/swagger-ui/**",
                 "/swagger-ui.html",
                 "/swagger-resources/**",
                 "/webjars/**",
                 "/favicon.ico",
-                "/error"
+                "/error",
+                "/error/**"
             )
             .cors(Customizer.withDefaults())
             .csrf(AbstractHttpConfigurer::disable)
@@ -52,16 +53,14 @@ public class SecurityConfig {
             .build();
     }
 
-    // ← Lower priority chain — handles everything else
     @Bean
     @Order(2)
     public SecurityFilterChain protectedFilterChain(HttpSecurity http) throws Exception {
-        return http
+        http
             .cors(Customizer.withDefaults())
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/error", "/favicon.ico").permitAll()  // ← add this
                 .requestMatchers(HttpMethod.GET,
                     "/api/products/**",
                     "/api/categories/**"
@@ -70,8 +69,8 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .userDetailsService(userDetailsService)
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-            .build();
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+        return http.build();
     }
 
     @Bean
@@ -80,7 +79,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+    public AuthenticationManager authenticationManager(
+            AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
     }
 }
