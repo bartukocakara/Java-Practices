@@ -1,37 +1,66 @@
 -- ============================================================
--- ECOMMERCE DATABASE SCHEMA
--- Run with: psql -U postgres -d ecommerce -f schema.sql
+-- ECOMMERCE MARKETPLACE — FULL SCHEMA
+-- Run: psql -U postgres -d ecommerce -f schema.sql
 -- ============================================================
 
--- Drop all tables in correct order (FK dependencies)
-DROP TABLE IF EXISTS cart_items        CASCADE;
-DROP TABLE IF EXISTS carts             CASCADE;
-DROP TABLE IF EXISTS order_items       CASCADE;
-DROP TABLE IF EXISTS orders            CASCADE;
-DROP TABLE IF EXISTS reviews           CASCADE;
-DROP TABLE IF EXISTS product_images    CASCADE;
-DROP TABLE IF EXISTS products          CASCADE;
-DROP TABLE IF EXISTS categories        CASCADE;
-DROP TABLE IF EXISTS users             CASCADE;
+-- Drop all tables in reverse dependency order
+DROP TABLE IF EXISTS vendor_reviews           CASCADE;
+DROP TABLE IF EXISTS vendor_payouts           CASCADE;
+DROP TABLE IF EXISTS vendor_applications      CASCADE;
+DROP TABLE IF EXISTS vendors                  CASCADE;
+DROP TABLE IF EXISTS variant_attribute_values CASCADE;
+DROP TABLE IF EXISTS product_variants         CASCADE;
+DROP TABLE IF EXISTS variation_attribute_values CASCADE;
+DROP TABLE IF EXISTS variation_attributes     CASCADE;
+DROP TABLE IF EXISTS cart_items               CASCADE;
+DROP TABLE IF EXISTS carts                    CASCADE;
+DROP TABLE IF EXISTS order_items              CASCADE;
+DROP TABLE IF EXISTS orders                   CASCADE;
+DROP TABLE IF EXISTS reviews                  CASCADE;
+DROP TABLE IF EXISTS product_images           CASCADE;
+DROP TABLE IF EXISTS products                 CASCADE;
+DROP TABLE IF EXISTS categories               CASCADE;
+DROP TABLE IF EXISTS user_addresses           CASCADE;
+DROP TABLE IF EXISTS users                    CASCADE;
 
 -- ============================================================
 -- USERS
 -- ============================================================
 CREATE TABLE users (
-    id            SERIAL PRIMARY KEY,
-    username      VARCHAR(50)  NOT NULL UNIQUE,
-    email         VARCHAR(100) NOT NULL UNIQUE,
-    password      TEXT         NOT NULL,
-    role          VARCHAR(20)  NOT NULL DEFAULT 'ROLE_USER'
-                               CHECK (role IN ('ROLE_USER', 'ROLE_ADMIN')),
-    created_at    TIMESTAMP    NOT NULL DEFAULT NOW()
+    id         SERIAL PRIMARY KEY,
+    username   VARCHAR(50)  NOT NULL UNIQUE,
+    email      VARCHAR(100) NOT NULL UNIQUE,
+    password   TEXT         NOT NULL,
+    role       VARCHAR(20)  NOT NULL DEFAULT 'ROLE_USER'
+                            CHECK (role IN ('ROLE_USER','ROLE_ADMIN','ROLE_VENDOR')),
+    created_at TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_users_username ON users(username);
 CREATE INDEX idx_users_email    ON users(email);
+CREATE INDEX idx_users_role     ON users(role);
 
 -- ============================================================
--- CATEGORIES (self-referencing tree — unlimited depth)
+-- USER ADDRESSES
+-- ============================================================
+CREATE TABLE user_addresses (
+    id           SERIAL PRIMARY KEY,
+    user_id      INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title        VARCHAR(50)  NOT NULL,
+    full_name    VARCHAR(100) NOT NULL,
+    phone        VARCHAR(20)  NOT NULL,
+    address_line VARCHAR(255) NOT NULL,
+    city         VARCHAR(100) NOT NULL,
+    country      VARCHAR(100) NOT NULL DEFAULT 'Turkey',
+    is_default   BOOLEAN      NOT NULL DEFAULT FALSE,
+    created_at   TIMESTAMP    NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_user_addresses_user ON user_addresses(user_id);
+
+-- ============================================================
+-- CATEGORIES (unlimited depth tree)
 -- ============================================================
 CREATE TABLE categories (
     id          SERIAL PRIMARY KEY,
@@ -44,39 +73,153 @@ CREATE TABLE categories (
 CREATE INDEX idx_categories_parent ON categories(parent_id);
 
 -- ============================================================
+-- VENDORS
+-- ============================================================
+CREATE TABLE vendors (
+    id              SERIAL PRIMARY KEY,
+    user_id         INTEGER       NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    store_name      VARCHAR(100)  NOT NULL UNIQUE,
+    store_slug      VARCHAR(100)  NOT NULL UNIQUE,
+    description     TEXT,
+    logo_url        VARCHAR(255),
+    banner_url      VARCHAR(255),
+    email           VARCHAR(100)  NOT NULL,
+    phone           VARCHAR(20),
+    address         TEXT,
+    status          VARCHAR(20)   NOT NULL DEFAULT 'PENDING'
+                                  CHECK (status IN ('PENDING','ACTIVE','SUSPENDED')),
+    commission_rate NUMERIC(5,2)  NOT NULL DEFAULT 10.00,
+    total_sales     INTEGER       NOT NULL DEFAULT 0,
+    rating          DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    created_at      TIMESTAMP     NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_vendors_slug   ON vendors(store_slug);
+CREATE INDEX idx_vendors_status ON vendors(status);
+CREATE INDEX idx_vendors_user   ON vendors(user_id);
+
+-- ============================================================
+-- VENDOR APPLICATIONS
+-- ============================================================
+CREATE TABLE vendor_applications (
+    id           SERIAL PRIMARY KEY,
+    user_id      INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    store_name   VARCHAR(100) NOT NULL,
+    store_slug   VARCHAR(100) NOT NULL,
+    description  TEXT,
+    email        VARCHAR(100) NOT NULL,
+    phone        VARCHAR(20),
+    address      TEXT,
+    status       VARCHAR(20)  NOT NULL DEFAULT 'PENDING'
+                              CHECK (status IN ('PENDING','APPROVED','REJECTED')),
+    admin_note   TEXT,
+    created_at   TIMESTAMP    NOT NULL DEFAULT NOW(),
+    reviewed_at  TIMESTAMP,
+    reviewed_by  INTEGER REFERENCES users(id)
+);
+
+CREATE INDEX idx_vendor_applications_user   ON vendor_applications(user_id);
+CREATE INDEX idx_vendor_applications_status ON vendor_applications(status);
+
+-- ============================================================
 -- PRODUCTS
 -- ============================================================
 CREATE TABLE products (
     id             SERIAL PRIMARY KEY,
-    name           VARCHAR(255)  NOT NULL,
+    name           VARCHAR(255)     NOT NULL,
     description    TEXT,
-    price          NUMERIC(18,2) NOT NULL CHECK (price > 0),
-    stock          INTEGER       NOT NULL DEFAULT 0 CHECK (stock >= 0),
-    slug           VARCHAR(255)  NOT NULL UNIQUE,
-    category_id    INTEGER       REFERENCES categories(id) ON DELETE SET NULL,
+    price          NUMERIC(18,2)    NOT NULL CHECK (price > 0),
+    base_price     NUMERIC(18,2),
+    stock          INTEGER          NOT NULL DEFAULT 0 CHECK (stock >= 0),
+    slug           VARCHAR(255)     NOT NULL UNIQUE,
+    category_id    INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+    vendor_id      INTEGER REFERENCES vendors(id) ON DELETE SET NULL,
+    status         VARCHAR(20)      NOT NULL DEFAULT 'ACTIVE'
+                                    CHECK (status IN ('DRAFT','ACTIVE','PAUSED','DELETED')),
     average_rating DOUBLE PRECISION NOT NULL DEFAULT 0.0,
     review_count   INTEGER          NOT NULL DEFAULT 0,
-    created_at     TIMESTAMP     NOT NULL DEFAULT NOW(),
-    updated_at     TIMESTAMP     NOT NULL DEFAULT NOW()
+    created_at     TIMESTAMP        NOT NULL DEFAULT NOW(),
+    updated_at     TIMESTAMP        NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_products_slug     ON products(slug);
 CREATE INDEX idx_products_category ON products(category_id);
+CREATE INDEX idx_products_vendor   ON products(vendor_id);
+CREATE INDEX idx_products_status   ON products(status);
 CREATE INDEX idx_products_price    ON products(price);
 
 -- ============================================================
 -- PRODUCT IMAGES
 -- ============================================================
 CREATE TABLE product_images (
-    id          SERIAL PRIMARY KEY,
-    product_id  INTEGER      NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-    image_url   VARCHAR(255) NOT NULL,
-    is_primary  BOOLEAN      NOT NULL DEFAULT FALSE,
-    sort_order  INTEGER      NOT NULL DEFAULT 0,
-    created_at  TIMESTAMP    NOT NULL DEFAULT NOW()
+    id         SERIAL PRIMARY KEY,
+    product_id INTEGER      NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    image_url  VARCHAR(255) NOT NULL,
+    is_primary BOOLEAN      NOT NULL DEFAULT FALSE,
+    sort_order INTEGER      NOT NULL DEFAULT 0,
+    created_at TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_product_images_product ON product_images(product_id);
+
+-- ============================================================
+-- VARIATION ATTRIBUTES (Size, Color, Material, etc.)
+-- ============================================================
+CREATE TABLE variation_attributes (
+    id   SERIAL PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE
+);
+
+CREATE TABLE variation_attribute_values (
+    id           SERIAL PRIMARY KEY,
+    attribute_id INTEGER      NOT NULL REFERENCES variation_attributes(id) ON DELETE CASCADE,
+    value        VARCHAR(100) NOT NULL,
+    CONSTRAINT uq_attr_value UNIQUE (attribute_id, value)
+);
+
+-- ============================================================
+-- PRODUCT VARIANTS (SKU level)
+-- ============================================================
+CREATE TABLE product_variants (
+    id         SERIAL PRIMARY KEY,
+    product_id INTEGER       NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    sku        VARCHAR(100)  NOT NULL UNIQUE,
+    price      NUMERIC(18,2) NOT NULL CHECK (price > 0),
+    stock      INTEGER       NOT NULL DEFAULT 0 CHECK (stock >= 0),
+    is_active  BOOLEAN       NOT NULL DEFAULT TRUE,
+    image_url  VARCHAR(255),
+    created_at TIMESTAMP     NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP     NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_variants_product ON product_variants(product_id);
+CREATE INDEX idx_variants_sku     ON product_variants(sku);
+
+-- ============================================================
+-- VARIANT ATTRIBUTE VALUES (join)
+-- ============================================================
+CREATE TABLE variant_attribute_values (
+    variant_id   INTEGER NOT NULL REFERENCES product_variants(id) ON DELETE CASCADE,
+    attribute_id INTEGER NOT NULL REFERENCES variation_attributes(id),
+    value_id     INTEGER NOT NULL REFERENCES variation_attribute_values(id),
+    PRIMARY KEY (variant_id, attribute_id)
+);
+
+-- ============================================================
+-- REVIEWS
+-- ============================================================
+CREATE TABLE reviews (
+    id         SERIAL PRIMARY KEY,
+    user_id    INTEGER  NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    product_id INTEGER  NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    rating     SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    comment    TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_user_product_review UNIQUE (user_id, product_id)
+);
+
+CREATE INDEX idx_reviews_product ON reviews(product_id);
+CREATE INDEX idx_reviews_user    ON reviews(user_id);
 
 -- ============================================================
 -- ORDERS
@@ -109,29 +252,16 @@ CREATE TABLE order_items (
     id           SERIAL PRIMARY KEY,
     order_id     INTEGER       NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
     product_id   INTEGER       NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+    variant_id   INTEGER REFERENCES product_variants(id) ON DELETE RESTRICT,
     product_name VARCHAR(255)  NOT NULL,
+    variant_info JSONB,
     quantity     INTEGER       NOT NULL CHECK (quantity > 0),
     unit_price   NUMERIC(18,2) NOT NULL CHECK (unit_price > 0)
 );
 
 CREATE INDEX idx_order_items_order   ON order_items(order_id);
 CREATE INDEX idx_order_items_product ON order_items(product_id);
-
--- ============================================================
--- REVIEWS
--- ============================================================
-CREATE TABLE reviews (
-    id         SERIAL PRIMARY KEY,
-    user_id    INTEGER  NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    product_id INTEGER  NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-    rating     SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
-    comment    TEXT,
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_user_product_review UNIQUE (user_id, product_id)
-);
-
-CREATE INDEX idx_reviews_product ON reviews(product_id);
-CREATE INDEX idx_reviews_user    ON reviews(user_id);
+CREATE INDEX idx_order_items_variant ON order_items(variant_id);
 
 -- ============================================================
 -- CARTS
@@ -150,15 +280,57 @@ CREATE TABLE cart_items (
     id         SERIAL PRIMARY KEY,
     cart_id    INTEGER NOT NULL REFERENCES carts(id) ON DELETE CASCADE,
     product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    variant_id INTEGER REFERENCES product_variants(id) ON DELETE CASCADE,
     quantity   INTEGER NOT NULL CHECK (quantity > 0),
-    CONSTRAINT uq_cart_product UNIQUE (cart_id, product_id)
+    CONSTRAINT uq_cart_product_variant UNIQUE (cart_id, product_id, variant_id)
 );
 
 CREATE INDEX idx_cart_items_cart    ON cart_items(cart_id);
 CREATE INDEX idx_cart_items_product ON cart_items(product_id);
 
 -- ============================================================
--- SUMMARY
--- tables:  users, categories, products, product_images,
---          orders, order_items, reviews, carts, cart_items
+-- VENDOR PAYOUTS
+-- ============================================================
+CREATE TABLE vendor_payouts (
+    id         SERIAL PRIMARY KEY,
+    vendor_id  INTEGER       NOT NULL REFERENCES vendors(id),
+    order_id   INTEGER       NOT NULL REFERENCES orders(id),
+    amount     NUMERIC(18,2) NOT NULL,
+    commission NUMERIC(18,2) NOT NULL,
+    net_amount NUMERIC(18,2) NOT NULL,
+    status     VARCHAR(20)   NOT NULL DEFAULT 'PENDING'
+                             CHECK (status IN ('PENDING','PAID','CANCELLED')),
+    created_at TIMESTAMP     NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_vendor_payouts_vendor ON vendor_payouts(vendor_id);
+CREATE INDEX idx_vendor_payouts_order  ON vendor_payouts(order_id);
+
+-- ============================================================
+-- VENDOR REVIEWS
+-- ============================================================
+CREATE TABLE vendor_reviews (
+    id         SERIAL PRIMARY KEY,
+    vendor_id  INTEGER  NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
+    user_id    INTEGER  NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    order_id   INTEGER  NOT NULL REFERENCES orders(id),
+    rating     SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    comment    TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_vendor_user_review UNIQUE (vendor_id, user_id)
+);
+
+CREATE INDEX idx_vendor_reviews_vendor ON vendor_reviews(vendor_id);
+
+-- ============================================================
+-- TABLES SUMMARY
+-- users, user_addresses
+-- categories (tree)
+-- vendors, vendor_applications, vendor_payouts, vendor_reviews
+-- products, product_images
+-- variation_attributes, variation_attribute_values
+-- product_variants, variant_attribute_values
+-- reviews
+-- orders, order_items
+-- carts, cart_items
 -- ============================================================

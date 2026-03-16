@@ -3,6 +3,7 @@ package com.ecommerce.service;
 import com.ecommerce.dto.request.ProductRequest;
 import com.ecommerce.dto.response.ProductImageResponse;
 import com.ecommerce.dto.response.ProductResponse;
+import com.ecommerce.dto.response.ProductVariantResponse;
 import com.ecommerce.entity.*;
 import com.ecommerce.exception.ResourceNotFoundException;
 import com.ecommerce.repository.*;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -21,6 +23,8 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final SlugService         slugService;
+    private final ProductVariantService variantService;
+
     public Page<ProductResponse> getAll(int page, int size, String sortBy, String direction) {
         Sort sort = direction.equalsIgnoreCase("desc")
             ? Sort.by(sortBy).descending()
@@ -32,31 +36,42 @@ public class ProductService {
     // In ProductService — update filter method
     public Page<ProductResponse> filter(Long categoryId, BigDecimal minPrice,
                                      BigDecimal maxPrice, String name,
-                                     int page, int size) {
+                                     int page, int size,
+                                     String sortBy, String direction) {
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by("name").ascending());
+        // Use offset pageable without sort — ORDER BY is in the native query
+        Pageable pageable = PageRequest.of(page, size);
 
-        // If no categoryId use the simple filter query
+        // Sanitize sortBy to prevent SQL injection
+        String safeSortBy = switch (sortBy) {
+            case "price", "name", "createdAt" -> sortBy;
+            default -> "name";
+        };
+        String safeDirection = direction.equalsIgnoreCase("desc") ? "desc" : "asc";
+
         if (categoryId == null) {
             return productRepository.filter(
-                null, minPrice, maxPrice, name, pageable
+                null, minPrice, maxPrice, name, safeSortBy, safeDirection, pageable
             ).map(this::toResponse);
         }
 
-        // Build category id list including all descendants
         List<Long> ids = new ArrayList<>();
         ids.add(categoryId);
         categoryRepository.findAllDescendants(categoryId)
             .forEach(row -> ids.add(((Number) row[0]).longValue()));
 
         return productRepository.filterByCategoryIds(
-            ids, minPrice, maxPrice, name, pageable
+            ids, minPrice, maxPrice, name, safeSortBy, safeDirection, pageable
         ).map(this::toResponse);
     }
 
     public ProductResponse getById(Long id) {
-        return toResponse(findOrThrow(id));
-    }
+    Product product = productRepository.findByIdWithVariants(id)
+        .orElseThrow(() -> new ResourceNotFoundException("Product", id));
+    productRepository.findByIdWithImages(id)
+        .ifPresent(p -> product.setImages(p.getImages()));
+    return toResponse(product);
+}
 
     public List<ProductResponse> getByCategory(Long categoryId) {
         return productRepository.findByCategoryId(categoryId).stream().map(this::toResponse).toList();
@@ -109,8 +124,14 @@ public class ProductService {
     }
 
     public ProductResponse getBySlug(String slug) {
-        Product product = productRepository.findBySlug(slug)
+        // Fetch variants
+        Product product = productRepository.findBySlugWithVariants(slug)
             .orElseThrow(() -> new ResourceNotFoundException("Product", 0L));
+
+        // Fetch images separately and merge
+        productRepository.findBySlugWithImages(slug)
+            .ifPresent(p -> product.setImages(p.getImages()));
+
         return toResponse(product);
     }
 
@@ -124,28 +145,56 @@ public class ProductService {
     }
 
     private ProductResponse toResponse(Product p) {
+
         List<ProductImageResponse> images = p.getImages() == null
             ? List.of()
-            : p.getImages().stream().map(img -> new ProductImageResponse(
-                img.getId(),
-                img.getImageUrl(),
-                img.getIsPrimary(),
-                img.getSortOrder(),
-                img.getCreatedAt()
-            )).toList();
+            : p.getImages().stream()
+                .map(img -> new ProductImageResponse(
+                    img.getId(),
+                    img.getImageUrl(),
+                    img.getIsPrimary(),
+                    img.getSortOrder(),
+                    img.getCreatedAt()
+                ))
+                .sorted(Comparator.comparingInt(ProductImageResponse::sortOrder))
+                .toList();
+
+        List<ProductVariantResponse> variants = p.getVariants() == null
+            ? List.of()
+            : p.getVariants().stream()
+                .filter(v -> Boolean.TRUE.equals(v.getIsActive()))
+                .map(variantService::toResponse)
+                .toList();
+
+        BigDecimal basePrice = p.getBasePrice() != null ? p.getBasePrice() : p.getPrice();
+
+        BigDecimal maxPrice = variants.stream()
+            .map(ProductVariantResponse::price)
+            .max(BigDecimal::compareTo)
+            .orElse(basePrice);
+
+        Integer totalStock = variants.isEmpty()
+            ? p.getStock()
+            : variants.stream().mapToInt(ProductVariantResponse::stock).sum();
 
         return new ProductResponse(
             p.getId(),
             p.getName(),
             p.getDescription(),
-            p.getPrice(),
-            p.getStock(),
+            basePrice,
+            maxPrice,
+            totalStock,
             p.getCategory() != null ? p.getCategory().getName() : null,
+            null,
+            null,
+            null,
             p.getAverageRating(),
             p.getReviewCount(),
             p.getPrimaryImageUrl(),
             images,
-            p.getSlug()
+            variants,
+            p.getSlug(),
+            !variants.isEmpty()
         );
     }
 }

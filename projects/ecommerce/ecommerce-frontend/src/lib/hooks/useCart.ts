@@ -14,8 +14,8 @@ export function useCart() {
 
   const query = useQuery({
     queryKey: CART_KEYS.cart,
-    queryFn: cartApi.get,
-    enabled: isAuthenticated,
+    queryFn:  cartApi.get,
+    enabled:  isAuthenticated,
     staleTime: 30 * 1000,
   });
 
@@ -34,8 +34,15 @@ export function useAddToCart() {
   const queryClient = useQueryClient();
   const { setCart } = useCartStore();
   return useMutation({
-    mutationFn: ({ productId, quantity }: { productId: number; quantity: number }) =>
-      cartApi.addItem(productId, quantity),
+    mutationFn: ({
+      productId,
+      quantity,
+      variantId,
+    }: {
+      productId: number;
+      quantity: number;
+      variantId?: number;
+    }) => cartApi.addItem(productId, quantity, variantId),
     onSuccess: (cart) => {
       setCart(cart);
       queryClient.setQueryData(CART_KEYS.cart, cart);

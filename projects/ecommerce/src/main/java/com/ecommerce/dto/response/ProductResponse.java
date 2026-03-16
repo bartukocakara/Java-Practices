@@ -8,11 +8,17 @@ public record ProductResponse(
     String name,
     String description,
     BigDecimal price,
+    BigDecimal maxPrice,
     Integer stock,
     String categoryName,
+    Long vendorId,
+    String vendorName,
+    String vendorSlug,
     Double averageRating,
     Integer reviewCount,
     String primaryImageUrl,
     List<ProductImageResponse> images,
-    String slug
+    List<ProductVariantResponse> variants,
+    String slug,
+    boolean hasVariants
 ) {}

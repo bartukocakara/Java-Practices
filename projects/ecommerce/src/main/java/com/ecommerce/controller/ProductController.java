@@ -38,10 +38,12 @@ public class ProductController {
             @RequestParam(required = false) BigDecimal minPrice,
             @RequestParam(required = false) BigDecimal maxPrice,
             @RequestParam(required = false) String name,
-            @RequestParam(defaultValue = "0")  int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "0")    int page,
+            @RequestParam(defaultValue = "10")   int size,
+            @RequestParam(defaultValue = "name") String sortBy,      // ← add
+            @RequestParam(defaultValue = "asc")  String direction) { // ← add
         return ResponseEntity.ok(
-            productService.filter(categoryId, minPrice, maxPrice, name, page, size));
+            productService.filter(categoryId, minPrice, maxPrice, name, page, size, sortBy, direction));
     }
 
     @GetMapping("/{slugOrId}")

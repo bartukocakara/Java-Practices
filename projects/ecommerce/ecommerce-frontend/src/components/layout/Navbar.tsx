@@ -2,24 +2,23 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ShoppingCart, User, Search, Menu, LogOut, Settings, Package, ChevronDown } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+import {
+  ShoppingCart, User, Search, Menu, LogOut,
+  Settings, Package, ChevronDown, Store
+} from 'lucide-react';
+import { Button }    from '@/components/ui/button';
+import { Input }     from '@/components/ui/input';
+import { Badge }     from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuthStore } from '@/store/authStore';
 import { useCartStore } from '@/store/cartStore';
-import { useCart } from '@/lib/hooks/useCart';
-import { ThemeToggle } from './ThemeToggle';
-import { useState } from 'react';
+import { useCart }      from '@/lib/hooks/useCart';
+import { ThemeToggle }  from './ThemeToggle';
+import { useState }     from 'react';
 
 const NAV_LINKS = [
   { label: 'Home',     href: '/' },
@@ -27,21 +26,25 @@ const NAV_LINKS = [
 ];
 
 export function Navbar() {
-  const pathname               = usePathname();
-  const router                 = useRouter();
-  const { isAuthenticated, isAdmin, username, logout } = useAuthStore();
-  const { itemCount }          = useCartStore();
-  const [search, setSearch]    = useState('');
+  const pathname    = usePathname();
+  const router      = useRouter();
+
+  // ← destructure role here
+  const { isAuthenticated, isAdmin, username, role, logout } = useAuthStore();
+  const { itemCount }     = useCartStore();
+  const [search, setSearch]       = useState('');
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Sync cart count from server
   useCart();
+
+  const isVendor = role === 'ROLE_VENDOR';
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (search.trim()) {
       router.push(`/products?search=${encodeURIComponent(search.trim())}`);
       setSearch('');
+      setMobileOpen(false);
     }
   };
 
@@ -60,28 +63,34 @@ export function Navbar() {
           <span className="hidden sm:inline">Marketplace</span>
         </Link>
 
-        {/* Desktop Nav Links */}
+        {/* Desktop Nav */}
         <nav className="hidden md:flex items-center gap-6 ml-4">
           {NAV_LINKS.map(link => (
             <Link
               key={link.href}
               href={link.href}
               className={`text-sm font-medium transition-colors hover:text-primary ${
-                pathname === link.href
-                  ? 'text-primary'
-                  : 'text-muted-foreground'
+                pathname === link.href ? 'text-primary' : 'text-muted-foreground'
               }`}
             >
               {link.label}
             </Link>
           ))}
+          {isVendor && (
+            <Link
+              href="/vendor"
+              className={`text-sm font-medium transition-colors hover:text-primary ${
+                pathname.startsWith('/vendor') ? 'text-primary' : 'text-muted-foreground'
+              }`}
+            >
+              My Store
+            </Link>
+          )}
           {isAdmin && (
             <Link
               href="/admin"
               className={`text-sm font-medium transition-colors hover:text-primary ${
-                pathname.startsWith('/admin')
-                  ? 'text-primary'
-                  : 'text-muted-foreground'
+                pathname.startsWith('/admin') ? 'text-primary' : 'text-muted-foreground'
               }`}
             >
               Admin
@@ -89,7 +98,7 @@ export function Navbar() {
           )}
         </nav>
 
-        {/* Search Bar */}
+        {/* Search */}
         <form onSubmit={handleSearch} className="flex-1 max-w-md mx-auto hidden md:flex">
           <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -103,7 +112,7 @@ export function Navbar() {
           </div>
         </form>
 
-        {/* Right Side Actions */}
+        {/* Right actions */}
         <div className="flex items-center gap-2 ml-auto">
           <ThemeToggle />
 
@@ -122,7 +131,7 @@ export function Navbar() {
             </Link>
           </Button>
 
-          {/* Auth */}
+          {/* Desktop Auth dropdown */}
           {isAuthenticated ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -132,21 +141,51 @@ export function Navbar() {
                   <ChevronDown className="h-3 w-3" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent align="end" className="w-52">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
+
                 <DropdownMenuItem asChild>
                   <Link href="/profile" className="cursor-pointer">
                     <User className="mr-2 h-4 w-4" />
                     Profile
                   </Link>
                 </DropdownMenuItem>
+
                 <DropdownMenuItem asChild>
                   <Link href="/profile/orders" className="cursor-pointer">
                     <Package className="mr-2 h-4 w-4" />
                     My Orders
                   </Link>
                 </DropdownMenuItem>
+
+                {/* Vendor links */}
+                {isVendor && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link href="/vendor" className="cursor-pointer">
+                        <Store className="mr-2 h-4 w-4" />
+                        Vendor Dashboard
+                      </Link>
+                    </DropdownMenuItem>
+                  </>
+                )}
+
+                {/* Become a vendor */}
+                {!isAdmin && !isVendor && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link href="/vendor/apply" className="cursor-pointer">
+                        <Store className="mr-2 h-4 w-4" />
+                        Become a Vendor
+                      </Link>
+                    </DropdownMenuItem>
+                  </>
+                )}
+
+                {/* Admin */}
                 {isAdmin && (
                   <>
                     <DropdownMenuSeparator />
@@ -158,6 +197,7 @@ export function Navbar() {
                     </DropdownMenuItem>
                   </>
                 )}
+
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={handleLogout}
@@ -179,7 +219,7 @@ export function Navbar() {
             </div>
           )}
 
-          {/* Mobile Menu */}
+          {/* Mobile menu */}
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="md:hidden">
@@ -189,7 +229,7 @@ export function Navbar() {
             <SheetContent side="right" className="w-72">
               <div className="flex flex-col gap-6 mt-6">
 
-                {/* Mobile Search */}
+                {/* Mobile search */}
                 <form onSubmit={handleSearch}>
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -202,7 +242,7 @@ export function Navbar() {
                   </div>
                 </form>
 
-                {/* Mobile Nav Links */}
+                {/* Mobile nav links */}
                 <nav className="flex flex-col gap-1">
                   {NAV_LINKS.map(link => (
                     <Link
@@ -216,6 +256,17 @@ export function Navbar() {
                       {link.label}
                     </Link>
                   ))}
+                  {isVendor && (
+                    <Link
+                      href="/vendor"
+                      onClick={() => setMobileOpen(false)}
+                      className={`px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-accent ${
+                        pathname.startsWith('/vendor') ? 'bg-accent text-primary' : ''
+                      }`}
+                    >
+                      My Store
+                    </Link>
+                  )}
                   {isAdmin && (
                     <Link
                       href="/admin"
@@ -229,27 +280,40 @@ export function Navbar() {
                   )}
                 </nav>
 
-                {/* Mobile Auth */}
+                {/* Mobile auth */}
                 <div className="border-t pt-4">
                   {isAuthenticated ? (
                     <div className="flex flex-col gap-1">
                       <p className="px-3 text-xs text-muted-foreground mb-2">
-                        Signed in as <span className="font-medium text-foreground">{username}</span>
+                        Signed in as{' '}
+                        <span className="font-medium text-foreground">{username}</span>
                       </p>
-                      <Link
-                        href="/profile"
-                        onClick={() => setMobileOpen(false)}
-                        className="px-3 py-2 rounded-md text-sm flex items-center gap-2 hover:bg-accent"
-                      >
+
+                      <Link href="/profile" onClick={() => setMobileOpen(false)}
+                        className="px-3 py-2 rounded-md text-sm flex items-center gap-2 hover:bg-accent">
                         <User className="h-4 w-4" /> Profile
                       </Link>
-                      <Link
-                        href="/profile/orders"
-                        onClick={() => setMobileOpen(false)}
-                        className="px-3 py-2 rounded-md text-sm flex items-center gap-2 hover:bg-accent"
-                      >
+
+                      <Link href="/profile/orders" onClick={() => setMobileOpen(false)}
+                        className="px-3 py-2 rounded-md text-sm flex items-center gap-2 hover:bg-accent">
                         <Package className="h-4 w-4" /> My Orders
                       </Link>
+
+                      {/* ← plain Link, not DropdownMenuItem */}
+                      {isVendor && (
+                        <Link href="/vendor" onClick={() => setMobileOpen(false)}
+                          className="px-3 py-2 rounded-md text-sm flex items-center gap-2 hover:bg-accent">
+                          <Store className="h-4 w-4" /> Vendor Dashboard
+                        </Link>
+                      )}
+
+                      {!isAdmin && !isVendor && (
+                        <Link href="/vendor/apply" onClick={() => setMobileOpen(false)}
+                          className="px-3 py-2 rounded-md text-sm flex items-center gap-2 hover:bg-accent">
+                          <Store className="h-4 w-4" /> Become a Vendor
+                        </Link>
+                      )}
+
                       <button
                         onClick={() => { handleLogout(); setMobileOpen(false); }}
                         className="px-3 py-2 rounded-md text-sm flex items-center gap-2 hover:bg-accent text-destructive text-left"

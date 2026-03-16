@@ -10,17 +10,18 @@ import {
   ShoppingBag, CreditCard, Truck, MapPin,
   Phone, User, FileText, Loader2, ChevronRight
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
+import { Button }       from '@/components/ui/button';
+import { Input }        from '@/components/ui/input';
+import { Label }        from '@/components/ui/label';
+import { Separator }    from '@/components/ui/separator';
+import { Textarea }     from '@/components/ui/textarea';
+import { Badge }        from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { useCart } from '@/lib/hooks/useCart';
+import { useCart }        from '@/lib/hooks/useCart';
 import { useCreateOrder } from '@/lib/hooks/useOrders';
-import { useAuthStore } from '@/store/authStore';
-import { useCartStore } from '@/store/cartStore';
+import { useAddresses }   from '@/lib/hooks/useAddresses';
+import { useAuthStore }   from '@/store/authStore';
+import { useCartStore }   from '@/store/cartStore';
 import { toast } from 'sonner';
 
 const checkoutSchema = z.object({
@@ -35,19 +36,14 @@ const checkoutSchema = z.object({
 
 type CheckoutForm = z.infer<typeof checkoutSchema>;
 
-const STATUS_COLORS: Record<string, string> = {
-  PENDING:   'bg-yellow-100 text-yellow-800',
-  CONFIRMED: 'bg-blue-100 text-blue-800',
-  SHIPPED:   'bg-purple-100 text-purple-800',
-  DELIVERED: 'bg-green-100 text-green-800',
-  CANCELLED: 'bg-red-100 text-red-800',
-};
+const fmt = (val: number | undefined | null) => (val ?? 0).toFixed(2);
 
 export default function CheckoutPage() {
   const router                    = useRouter();
   const { isAuthenticated }       = useAuthStore();
   const { clearCart }             = useCartStore();
   const { data: cart, isLoading } = useCart();
+  const { data: addresses = [] }  = useAddresses();
   const { mutate: createOrder, isPending } = useCreateOrder();
 
   const {
@@ -66,24 +62,44 @@ export default function CheckoutPage() {
 
   const paymentMethod = watch('paymentMethod');
 
+  // Redirect if not authenticated
   useEffect(() => {
     if (!isAuthenticated) router.push('/login');
   }, [isAuthenticated, router]);
 
-  const items       = cart?.items ?? [];
-  const subtotal    = cart?.totalAmount ?? 0;
-  const shipping    = subtotal >= 50 ? 0 : 9.99;
-  const tax         = subtotal * 0.08;
-  const orderTotal  = subtotal + shipping + tax;
-  
-  const fmt = (val: number | undefined | null) => (val ?? 0).toFixed(2);
+  // Auto-fill from default address
+  const defaultAddress = addresses.find(a => a.isDefault);
+  useEffect(() => {
+    if (defaultAddress) {
+      setValue('fullName',    defaultAddress.fullName);
+      setValue('phone',       defaultAddress.phone);
+      setValue('addressLine', defaultAddress.addressLine);
+      setValue('city',        defaultAddress.city);
+      setValue('country',     defaultAddress.country);
+    }
+  }, [defaultAddress, setValue]);
+
+  const fillFromAddress = (addressId: number) => {
+    const address = addresses.find(a => a.id === addressId);
+    if (!address) return;
+    setValue('fullName',    address.fullName,    { shouldValidate: true });
+    setValue('phone',       address.phone,       { shouldValidate: true });
+    setValue('addressLine', address.addressLine, { shouldValidate: true });
+    setValue('city',        address.city,        { shouldValidate: true });
+    setValue('country',     address.country,     { shouldValidate: true });
+  };
+
+  const items      = cart?.items ?? [];
+  const subtotal   = cart?.totalAmount ?? 0;
+  const shipping   = subtotal >= 50 ? 0 : 9.99;
+  const tax        = subtotal * 0.08;
+  const orderTotal = subtotal + shipping + tax;
 
   const onSubmit = (data: CheckoutForm) => {
     if (items.length === 0) {
       toast.error('Your cart is empty');
       return;
     }
-
     createOrder(
       {
         ...data,
@@ -124,7 +140,7 @@ export default function CheckoutPage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
 
-      {/* Header */}
+      {/* Breadcrumb */}
       <div className="mb-8">
         <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
           <Link href="/cart" className="hover:text-foreground transition-colors">Cart</Link>
@@ -142,17 +158,44 @@ export default function CheckoutPage() {
 
             {/* Shipping Info */}
             <div className="rounded-xl border bg-card p-6 space-y-4">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold shrink-0">
                   1
                 </div>
                 <h2 className="text-lg font-semibold">Shipping Information</h2>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Full Name */}
+              {/* Saved address quick-fill */}
+              {addresses.length > 0 && (
                 <div className="space-y-2">
-                  <Label htmlFor="fullName" className="flex items-center gap-1">
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+                    Fill from saved address
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {addresses.map(addr => (
+                      <button
+                        key={addr.id}
+                        type="button"
+                        onClick={() => fillFromAddress(addr.id)}
+                        className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium hover:border-primary hover:bg-primary/5 transition-all"
+                      >
+                        <MapPin className="h-3 w-3 text-primary" />
+                        {addr.title}
+                        {addr.isDefault && (
+                          <span className="text-yellow-500 text-[10px]">★</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  <Separator />
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                {/* Full Name */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="fullName" className="flex items-center gap-1.5 text-sm">
                     <User className="h-3 w-3" /> Full Name
                   </Label>
                   <Input
@@ -167,8 +210,8 @@ export default function CheckoutPage() {
                 </div>
 
                 {/* Phone */}
-                <div className="space-y-2">
-                  <Label htmlFor="phone" className="flex items-center gap-1">
+                <div className="space-y-1.5">
+                  <Label htmlFor="phone" className="flex items-center gap-1.5 text-sm">
                     <Phone className="h-3 w-3" /> Phone
                   </Label>
                   <Input
@@ -182,9 +225,9 @@ export default function CheckoutPage() {
                   )}
                 </div>
 
-                {/* Address */}
-                <div className="sm:col-span-2 space-y-2">
-                  <Label htmlFor="addressLine" className="flex items-center gap-1">
+                {/* Address Line */}
+                <div className="sm:col-span-2 space-y-1.5">
+                  <Label htmlFor="addressLine" className="flex items-center gap-1.5 text-sm">
                     <MapPin className="h-3 w-3" /> Address
                   </Label>
                   <Input
@@ -199,8 +242,8 @@ export default function CheckoutPage() {
                 </div>
 
                 {/* City */}
-                <div className="space-y-2">
-                  <Label htmlFor="city">City</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="city" className="text-sm">City</Label>
                   <Input
                     id="city"
                     placeholder="Istanbul"
@@ -213,8 +256,8 @@ export default function CheckoutPage() {
                 </div>
 
                 {/* Country */}
-                <div className="space-y-2">
-                  <Label htmlFor="country">Country</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="country" className="text-sm">Country</Label>
                   <Input
                     id="country"
                     placeholder="Turkey"
@@ -227,10 +270,11 @@ export default function CheckoutPage() {
                 </div>
 
                 {/* Notes */}
-                <div className="sm:col-span-2 space-y-2">
-                  <Label htmlFor="notes" className="flex items-center gap-1">
-                    <FileText className="h-3 w-3" /> Order Notes
-                    <span className="text-muted-foreground font-normal">(optional)</span>
+                <div className="sm:col-span-2 space-y-1.5">
+                  <Label htmlFor="notes" className="flex items-center gap-1.5 text-sm">
+                    <FileText className="h-3 w-3" />
+                    Order Notes
+                    <span className="text-muted-foreground font-normal text-xs">(optional)</span>
                   </Label>
                   <Textarea
                     id="notes"
@@ -239,13 +283,28 @@ export default function CheckoutPage() {
                     {...register('notes')}
                   />
                 </div>
+
+                {/* Save address hint */}
+                {addresses.length === 0 && (
+                  <div className="sm:col-span-2">
+                    <p className="text-xs text-muted-foreground">
+                      💡 You can save addresses for faster checkout in{' '}
+                      <Link
+                        href="/profile/addresses"
+                        className="text-primary hover:underline font-medium"
+                      >
+                        My Addresses
+                      </Link>
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Payment Method */}
             <div className="rounded-xl border bg-card p-6 space-y-4">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold shrink-0">
                   2
                 </div>
                 <h2 className="text-lg font-semibold">Payment Method</h2>
@@ -253,70 +312,72 @@ export default function CheckoutPage() {
 
               <RadioGroup
                 value={paymentMethod}
-                onValueChange={(val) => setValue('paymentMethod', val as 'CASH_ON_DELIVERY' | 'CREDIT_CARD')}
+                onValueChange={(val) =>
+                  setValue('paymentMethod', val as 'CASH_ON_DELIVERY' | 'CREDIT_CARD')
+                }
                 className="space-y-3"
               >
                 {/* Cash on Delivery */}
-                <div className={`flex items-center gap-4 p-4 rounded-lg border-2 cursor-pointer transition-colors ${
+                <div className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
                   paymentMethod === 'CASH_ON_DELIVERY'
                     ? 'border-primary bg-primary/5'
-                    : 'border-muted hover:border-muted-foreground/30'
+                    : 'border-border hover:border-muted-foreground/40'
                 }`}>
                   <RadioGroupItem value="CASH_ON_DELIVERY" id="cod" />
                   <Label htmlFor="cod" className="flex items-center gap-3 cursor-pointer flex-1">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30 shrink-0">
                       <Truck className="h-5 w-5 text-green-600" />
                     </div>
-                    <div>
-                      <p className="font-medium">Cash on Delivery</p>
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">Cash on Delivery</p>
                       <p className="text-xs text-muted-foreground">Pay when your order arrives</p>
                     </div>
-                    <Badge variant="secondary" className="ml-auto">Free</Badge>
+                    <Badge variant="secondary" className="shrink-0">Free</Badge>
                   </Label>
                 </div>
 
                 {/* Credit Card */}
-                <div className={`flex items-center gap-4 p-4 rounded-lg border-2 cursor-pointer transition-colors ${
+                <div className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${
                   paymentMethod === 'CREDIT_CARD'
                     ? 'border-primary bg-primary/5'
-                    : 'border-muted hover:border-muted-foreground/30'
+                    : 'border-border hover:border-muted-foreground/40'
                 }`}>
                   <RadioGroupItem value="CREDIT_CARD" id="cc" />
                   <Label htmlFor="cc" className="flex items-center gap-3 cursor-pointer flex-1">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30 shrink-0">
                       <CreditCard className="h-5 w-5 text-blue-600" />
                     </div>
-                    <div>
-                      <p className="font-medium">Credit Card</p>
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">Credit Card</p>
                       <p className="text-xs text-muted-foreground">Visa, Mastercard, Amex</p>
                     </div>
-                    <Badge variant="outline" className="ml-auto">Secure</Badge>
+                    <Badge variant="outline" className="shrink-0">Secure</Badge>
                   </Label>
                 </div>
               </RadioGroup>
 
-              {/* Credit card fields — shown only when selected */}
+              {/* Credit card fields */}
               {paymentMethod === 'CREDIT_CARD' && (
-                <div className="mt-4 p-4 rounded-lg bg-muted/50 space-y-3">
-                  <div className="space-y-2">
-                    <Label>Card Number</Label>
+                <div className="p-4 rounded-xl bg-muted/50 space-y-3 border">
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Card Number</Label>
                     <Input placeholder="1234 5678 9012 3456" maxLength={19} />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label>Expiry Date</Label>
+                    <div className="space-y-1.5">
+                      <Label className="text-sm">Expiry</Label>
                       <Input placeholder="MM/YY" maxLength={5} />
                     </div>
-                    <div className="space-y-2">
-                      <Label>CVV</Label>
+                    <div className="space-y-1.5">
+                      <Label className="text-sm">CVV</Label>
                       <Input placeholder="123" maxLength={4} type="password" />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Name on Card</Label>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Name on Card</Label>
                     <Input placeholder="John Doe" />
                   </div>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <p className="text-xs text-muted-foreground">
                     🔒 Your card details are encrypted and secure
                   </p>
                 </div>
@@ -327,19 +388,19 @@ export default function CheckoutPage() {
           {/* ── Right: Order Summary ── */}
           <div className="lg:col-span-1">
             <div className="rounded-xl border bg-card p-6 space-y-4 sticky top-24">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold shrink-0">
                   3
                 </div>
                 <h2 className="text-lg font-semibold">Order Summary</h2>
               </div>
 
-              {/* Items */}
-              <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+              {/* Items list */}
+              <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
                 {items.map(item => (
                   <div key={item.cartItemId} className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted shrink-0 text-xs font-bold text-muted-foreground">
-                      {item.quantity}x
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted shrink-0 text-xs font-bold text-muted-foreground">
+                      {item.quantity}×
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium line-clamp-1">{item.productName}</p>
@@ -358,25 +419,26 @@ export default function CheckoutPage() {
 
               {/* Totals */}
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span>${fmt(subtotal)}</span>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Subtotal</span>
+                  <span className="text-foreground">${fmt(subtotal)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Shipping</span>
-                  {shipping === 0
-                    ? <span className="text-green-600 font-medium">Free</span>
-                    : <span>${fmt(shipping)}</span>
-                  }
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Shipping</span>
+                  {shipping === 0 ? (
+                    <span className="text-green-600 font-medium">Free</span>
+                  ) : (
+                    <span className="text-foreground">${fmt(shipping)}</span>
+                  )}
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Tax (8%)</span>
-                  <span>${fmt(tax)}</span>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Tax (8%)</span>
+                  <span className="text-foreground">${fmt(tax)}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between font-bold text-base">
                   <span>Total</span>
-                  <span className="text-primary">${fmt(orderTotal)}</span>
+                  <span className="text-primary text-lg">${fmt(orderTotal)}</span>
                 </div>
               </div>
 
@@ -387,15 +449,23 @@ export default function CheckoutPage() {
                 disabled={isPending || items.length === 0}
               >
                 {isPending ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Placing Order...</>
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Placing Order...
+                  </>
                 ) : (
-                  <><ShoppingBag className="mr-2 h-4 w-4" /> Place Order</>
+                  <>
+                    <ShoppingBag className="mr-2 h-4 w-4" />
+                    Place Order · ${fmt(orderTotal)}
+                  </>
                 )}
               </Button>
 
-              <p className="text-xs text-center text-muted-foreground">
-                By placing your order, you agree to our{' '}
-                <span className="underline cursor-pointer">Terms of Service</span>
+              <p className="text-xs text-center text-muted-foreground leading-relaxed">
+                By placing your order you agree to our{' '}
+                <span className="underline cursor-pointer hover:text-foreground transition-colors">
+                  Terms of Service
+                </span>
               </p>
             </div>
           </div>

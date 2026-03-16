@@ -65,6 +65,10 @@ public class SecurityConfig {
                     "/api/products/**",
                     "/api/categories/**"
                 ).permitAll()
+                .requestMatchers("/api/vendor/apply").authenticated()
+                .requestMatchers("/api/vendor/application").authenticated()
+                .requestMatchers("/api/vendor/**").hasRole("VENDOR")
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/users/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )

@@ -5,7 +5,10 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "products")
@@ -51,7 +54,7 @@ public class Product {
            orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("sortOrder ASC, createdAt ASC")
     @Builder.Default
-    private List<ProductImage> images = new ArrayList<>();
+    private Set<ProductImage> images = new LinkedHashSet<>();
 
     // Helper — get primary image url
     @Transient
@@ -60,14 +63,29 @@ public class Product {
         return images.stream()
             .filter(ProductImage::getIsPrimary)
             .findFirst()
-            .orElse(images.get(0))
+            .orElse(images.iterator().next())
             .getImageUrl();
     }
+    
 
     @Column(unique = true, nullable = false, length = 255)
     private String slug;
 
-    // Auto-generate slug before first persist if somehow missed
+    @Column(name = "base_price")
+    private BigDecimal basePrice;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private String status = "ACTIVE";
+
+    @Column
+    private Long vendorId;
+
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL,
+           fetch = FetchType.LAZY, orphanRemoval = true)
+    @Builder.Default
+    private Set<ProductVariant> variants = new LinkedHashSet<>();
+    
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

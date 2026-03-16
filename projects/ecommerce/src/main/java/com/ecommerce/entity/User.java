@@ -32,5 +32,5 @@ public class User {
     @PrePersist
     protected void onCreate() { this.createdAt = LocalDateTime.now(); }
 
-    public enum Role { ROLE_USER, ROLE_ADMIN }
+    public enum Role { ROLE_USER, ROLE_ADMIN, ROLE_VENDOR }
 }

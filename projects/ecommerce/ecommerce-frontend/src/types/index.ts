@@ -1,5 +1,6 @@
-export type Role = 'ROLE_USER' | 'ROLE_ADMIN';
+export type Role        = 'ROLE_USER' | 'ROLE_ADMIN' | 'ROLE_VENDOR';
 export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
+export type PaymentMethod = 'CASH_ON_DELIVERY' | 'CREDIT_CARD';
 
 export interface User {
   id: number;
@@ -37,17 +38,35 @@ export interface ProductImage {
   createdAt: string;
 }
 
+export interface ProductVariantResponse {
+  id: number;
+  sku: string;
+  price: number;
+  maxPrice?: number;
+  stock: number;
+  isActive: boolean;
+  imageUrl?: string;
+  displayLabel: string;
+  attributes: Record<string, string>;
+}
+
 export interface Product {
   id: number;
   name: string;
   description: string;
   price: number;
+  maxPrice?: number;
   stock: number;
-  categoryName: string | null;
-  averageRating: number;
-  reviewCount: number;
-  primaryImageUrl: string | null;
-  images: ProductImage[];
+  categoryName: string;
+  vendorId?: number;
+  vendorName?: string;
+  vendorSlug?: string;
+  averageRating?: number;
+  reviewCount?: number;
+  primaryImageUrl?: string;
+  images?: ProductImage[];
+  variants?: ProductVariantResponse[];
+  hasVariants: boolean;
   slug: string;
 }
 
@@ -64,7 +83,9 @@ export interface PageResponse<T> {
 export interface CartItem {
   cartItemId: number;
   productId: number;
+  variantId?: number;
   productName: string;
+  variantLabel?: string;
   unitPrice: number;
   quantity: number;
   subtotal: number;
@@ -76,12 +97,12 @@ export interface Cart {
   totalAmount: number;
 }
 
-export type PaymentMethod = 'CASH_ON_DELIVERY' | 'CREDIT_CARD';
-
 export interface OrderItemResponse {
   id: number;
   productId: number;
   productName: string;
+  variantId?: number;
+  variantInfo?: Record<string, string>;
   quantity: number;
   unitPrice: number;
   subtotal: number;
@@ -108,6 +129,78 @@ export interface Review {
   rating: number;
   comment: string;
   createdAt: string;
+}
+
+export interface VendorApplication {
+  id: number;
+  storeName: string;
+  storeSlug: string;
+  description: string;
+  email: string;
+  phone?: string;
+  address?: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  adminNote?: string;
+  username: string;
+  createdAt: string;
+  reviewedAt?: string;
+}
+
+export interface Vendor {
+  id: number;
+  storeName: string;
+  storeSlug: string;
+  description?: string;
+  logoUrl?: string;
+  bannerUrl?: string;
+  email: string;
+  phone?: string;
+  status: 'PENDING' | 'ACTIVE' | 'SUSPENDED';
+  commissionRate: number;
+  totalSales: number;
+  rating: number;
+  username: string;
+  createdAt: string;
+}
+
+export interface VendorDashboard {
+  vendorId: number;
+  storeName: string;
+  storeSlug: string;
+  status: string;
+  totalRevenue: number;
+  monthRevenue: number;
+  totalOrders: number;
+  pendingOrders: number;
+  totalProducts: number;
+  activeProducts: number;
+  lowStockProducts: number;
+  commissionRate: number;
+  totalCommission: number;
+  netEarnings: number;
+  recentOrders: Order[];
+}
+
+export interface Address {
+  id: number;
+  title: string;
+  fullName: string;
+  phone: string;
+  addressLine: string;
+  city: string;
+  country: string;
+  isDefault: boolean;
+  createdAt: string;
+}
+
+export interface AddressRequest {
+  title: string;
+  fullName: string;
+  phone: string;
+  addressLine: string;
+  city: string;
+  country: string;
+  isDefault: boolean;
 }
 
 export interface ApiError {
