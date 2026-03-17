@@ -47,4 +47,11 @@ export const productApi = {
 
   delete: (id: number) =>
     api.delete(`/api/products/${id}`),
+  canReview: (productId: number) =>
+    api.get<{
+      canReview:       boolean;
+      reason:          'OK' | 'NOT_AUTHENTICATED' | 'NOT_PURCHASED' | 'ALREADY_REVIEWED';
+      hasPurchased:    boolean;
+      alreadyReviewed: boolean;
+    }>(`/api/products/${productId}/reviews/can-review`).then(r => r.data),
 };

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { productApi, FilterParams } from '@/lib/api/products';
+import { useAuthStore } from '@/store/authStore';
 
 export const PRODUCT_KEYS = {
   all:     ['products'] as const,
@@ -36,9 +37,10 @@ export function useFilteredProducts(params: FilterParams) {
 
 export function useProduct(slug: string) {
   return useQuery({
-    queryKey: PRODUCT_KEYS.detail(slug),
+    queryKey: ['product', slug],
     queryFn:  () => productApi.getBySlug(slug),
-    enabled:  !!slug && slug !== 'undefined',
+    enabled:  !!slug,
+    retry:    false,
   });
 }
 
@@ -98,5 +100,14 @@ export function useDeleteProduct() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: PRODUCT_KEYS.all });
     },
+  });
+}
+
+export function useCanReview(productId: number) {
+  const { isAuthenticated } = useAuthStore();
+  return useQuery({
+    queryKey: ['can-review', productId],
+    queryFn:  () => productApi.canReview(productId),
+    enabled:  isAuthenticated && productId > 0,
   });
 }
