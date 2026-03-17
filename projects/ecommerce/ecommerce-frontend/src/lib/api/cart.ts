@@ -9,7 +9,7 @@ export const cartApi = {
     api.post<Cart>('/api/cart/items', {
       productId,
       quantity,
-      ...(variantId ? { variantId } : {}),
+      variantId: variantId ?? null,  // ← send null not undefined
     }).then(r => r.data),
 
   updateItem: (cartItemId: number, quantity: number) =>

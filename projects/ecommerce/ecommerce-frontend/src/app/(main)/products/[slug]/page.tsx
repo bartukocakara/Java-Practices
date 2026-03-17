@@ -160,7 +160,8 @@ function ProductDetailContent({ slug }: { slug: string }) {
   const effectiveStock: number = (() => {
     if (product?.hasVariants) {
       if (selectedVariant) return selectedVariant.stock;
-      return product.stock;
+      // Sum all variant stocks
+      return (product.variants ?? []).reduce((sum, v) => sum + v.stock, 0);
     }
     return product?.stock ?? 0;
   })();
@@ -170,13 +171,14 @@ function ProductDetailContent({ slug }: { slug: string }) {
       if (selectedVariant) return selectedVariant.stock === 0;
       return (product.variants ?? []).every(v => v.stock === 0);
     }
-    return product?.stock === 0;
+    return (product?.stock ?? 0) === 0;
   })();
 
-  const isLowStock   = !isOutOfStock && effectiveStock <= 5;
+  const isLowStock   = !isOutOfStock && effectiveStock > 0 && effectiveStock <= 5;
   const displayPrice = selectedVariant?.price ?? product?.price ?? 0;
-  const hasVariants  = (product?.variants?.length ?? 0) > 0 && product?.hasVariants;
+  const hasVariants  = (product?.variants?.length ?? 0) > 0 && !!product?.hasVariants;
   const needsVariant = hasVariants && !selectedVariant;
+  const canAddToCart = !needsVariant && !isOutOfStock && effectiveStock > 0;
 
   const avgRating = reviews.length > 0
     ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
@@ -201,8 +203,10 @@ function ProductDetailContent({ slug }: { slug: string }) {
   const handleAddToCart = () => {
     if (!isAuthenticated) { router.push('/login'); return; }
     if (!product) return;
-    if (needsVariant) { toast.error('Please select options before adding to cart'); return; }
+    if (needsVariant)  { toast.error('Please select options before adding to cart'); return; }
     if (isOutOfStock)  { toast.error('This item is out of stock'); return; }
+    if (effectiveStock <= 0) { toast.error('This item is out of stock'); return; }
+
     addToCart(
       { productId: product.id, quantity, variantId: selectedVariant?.id },
       {
@@ -372,12 +376,23 @@ function ProductDetailContent({ slug }: { slug: string }) {
           <Separator />
 
           {/* Add to cart section */}
-          {isOutOfStock && !needsVariant ? (
+          {needsVariant ? (
+            // Has variants but none selected
+            <div className="p-4 rounded-xl bg-muted/50 border border-dashed text-center">
+              <p className="text-sm text-muted-foreground">
+                Select options above to add to cart
+              </p>
+            </div>
+
+          ) : isOutOfStock ? (
+            // Out of stock — no button at all
             <div className="space-y-3">
               <div className="flex items-center gap-3 p-4 rounded-xl bg-destructive/10 border border-destructive/20">
                 <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
                 <div>
-                  <p className="text-sm font-semibold text-destructive">Currently Out of Stock</p>
+                  <p className="text-sm font-semibold text-destructive">
+                    Currently Out of Stock
+                  </p>
                   <p className="text-xs text-destructive/80 mt-0.5">
                     Check back later or browse similar products
                   </p>
@@ -387,13 +402,9 @@ function ProductDetailContent({ slug }: { slug: string }) {
                 <Link href="/products">Browse Similar Products</Link>
               </Button>
             </div>
-          ) : needsVariant ? (
-            <div className="p-4 rounded-xl bg-muted/50 border border-dashed text-center">
-              <p className="text-sm text-muted-foreground">
-                Select options above to add to cart
-              </p>
-            </div>
+
           ) : (
+            // In stock — show quantity + add to cart
             <div className="space-y-4">
               {isLowStock && (
                 <div className="flex items-center gap-2 text-sm text-orange-600">
@@ -401,28 +412,38 @@ function ProductDetailContent({ slug }: { slug: string }) {
                   Only {effectiveStock} left — order soon!
                 </div>
               )}
+
               <div className="flex items-center gap-4">
                 <Label className="text-sm font-medium shrink-0">Quantity</Label>
                 <div className="flex items-center rounded-lg border overflow-hidden">
-                  <button onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                  <button
+                    onClick={() => setQuantity(q => Math.max(1, q - 1))}
                     disabled={quantity <= 1}
-                    className="px-3 py-2 hover:bg-muted transition-colors disabled:opacity-40">
+                    className="px-3 py-2 hover:bg-muted transition-colors disabled:opacity-40"
+                  >
                     <Minus className="h-4 w-4" />
                   </button>
                   <span className="px-4 py-2 text-sm font-medium border-x min-w-[3rem] text-center">
                     {quantity}
                   </span>
-                  <button onClick={() => setQuantity(q => Math.min(effectiveStock, q + 1))}
+                  <button
+                    onClick={() => setQuantity(q => Math.min(effectiveStock, q + 1))}
                     disabled={quantity >= effectiveStock}
-                    className="px-3 py-2 hover:bg-muted transition-colors disabled:opacity-40">
+                    className="px-3 py-2 hover:bg-muted transition-colors disabled:opacity-40"
+                  >
                     <Plus className="h-4 w-4" />
                   </button>
                 </div>
                 <span className="text-xs text-muted-foreground">{effectiveStock} available</span>
               </div>
+
               <div className="flex gap-3">
-                <Button size="lg" className="flex-1 gap-2"
-                  onClick={handleAddToCart} disabled={addingToCart}>
+                <Button
+                  size="lg"
+                  className="flex-1 gap-2"
+                  onClick={handleAddToCart}
+                  disabled={addingToCart || !canAddToCart}
+                >
                   <ShoppingCart className="h-5 w-5" />
                   {addingToCart ? 'Adding...' : 'Add to Cart'}
                 </Button>

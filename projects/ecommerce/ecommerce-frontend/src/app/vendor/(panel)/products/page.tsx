@@ -6,7 +6,8 @@ import Image from 'next/image';
 import {
   Plus, Search, Package, AlertTriangle,
   MoreVertical, Eye, Pencil, Trash2,
-  ToggleLeft, ToggleRight, Filter
+  ToggleLeft, ToggleRight, Filter,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { Button }    from '@/components/ui/button';
 import { Input }     from '@/components/ui/input';
@@ -33,7 +34,8 @@ import { Product } from '@/types';
 import { toast } from 'sonner';
 import { VendorProductFormDialog } from '@/components/vendor/VendorProductFormDialog';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:9090';
+const API_BASE    = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:9090';
+const PAGE_SIZE   = 10;
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   ACTIVE:  { label: 'Active',  color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' },
@@ -43,24 +45,46 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 };
 
 export default function VendorProductsPage() {
-  const [search, setSearch]           = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL');
-  const [lowStockOnly, setLowStockOnly] = useState(false);
-  const [deleteId, setDeleteId]       = useState<number | null>(null);
-  const [editProduct, setEditProduct] = useState<Product | null>(null);
+  const [search, setSearch]               = useState('');
+  const [statusFilter, setStatusFilter]   = useState('ALL');
+  const [lowStockOnly, setLowStockOnly]   = useState(false);
+  const [deleteId, setDeleteId]           = useState<number | null>(null);
+  const [editProduct, setEditProduct]     = useState<Product | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [page, setPage]                   = useState(0);
 
   const { data: products = [], isLoading } = useVendorProducts(
     statusFilter !== 'ALL' ? statusFilter : undefined,
     lowStockOnly || undefined
   );
   const { mutate: deleteProduct, isPending: deleting } = useDeleteVendorProduct();
-  const { mutate: updateStatus } = useUpdateVendorProductStatus();
+  const { mutate: updateStatus }                       = useUpdateVendorProductStatus();
 
+  // Filter
   const filtered = products.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase()) &&
     p.status !== 'DELETED'
   );
+
+  // Pagination — reset to page 0 when filters change
+  const totalPages  = Math.ceil(filtered.length / PAGE_SIZE);
+  const safePage    = Math.min(page, Math.max(0, totalPages - 1));
+  const paginated   = filtered.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setPage(0);
+  };
+
+  const handleStatusChange = (value: string) => {
+    setStatusFilter(value);
+    setPage(0);
+  };
+
+  const handleLowStockToggle = () => {
+    setLowStockOnly(p => !p);
+    setPage(0);
+  };
 
   const lowStockCount = products.filter(
     p => p.stock <= 5 && p.status === 'ACTIVE'
@@ -93,7 +117,8 @@ export default function VendorProductsPage() {
         <div>
           <h1 className="text-2xl font-bold">My Products</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {products.filter(p => p.status !== 'DELETED').length} products total
+            {filtered.length} product{filtered.length !== 1 ? 's' : ''}
+            {filtered.length !== products.length && ` (filtered from ${products.length})`}
           </p>
         </div>
         <Button onClick={() => setShowCreateForm(true)}>
@@ -105,7 +130,7 @@ export default function VendorProductsPage() {
       {/* Low stock alert */}
       {lowStockCount > 0 && (
         <div
-          onClick={() => setLowStockOnly(true)}
+          onClick={() => { setLowStockOnly(true); setPage(0); }}
           className="flex items-center gap-3 p-4 rounded-xl bg-destructive/10 border border-destructive/20 cursor-pointer hover:bg-destructive/15 transition-colors"
         >
           <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
@@ -123,12 +148,12 @@ export default function VendorProductsPage() {
           <Input
             placeholder="Search products..."
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => handleSearchChange(e.target.value)}
             className="pl-9"
           />
         </div>
 
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select value={statusFilter} onValueChange={handleStatusChange}>
           <SelectTrigger className="w-36">
             <SelectValue />
           </SelectTrigger>
@@ -143,7 +168,7 @@ export default function VendorProductsPage() {
         <Button
           variant={lowStockOnly ? 'default' : 'outline'}
           size="sm"
-          onClick={() => setLowStockOnly(p => !p)}
+          onClick={handleLowStockToggle}
           className="flex items-center gap-1.5"
         >
           <Filter className="h-3.5 w-3.5" />
@@ -154,7 +179,7 @@ export default function VendorProductsPage() {
       {/* Product table */}
       {isLoading ? (
         <div className="space-y-3">
-          {Array.from({ length: 5 }).map((_, i) => (
+          {Array.from({ length: PAGE_SIZE }).map((_, i) => (
             <Skeleton key={i} className="h-20 w-full rounded-xl" />
           ))}
         </div>
@@ -177,137 +202,184 @@ export default function VendorProductsPage() {
           )}
         </div>
       ) : (
-        <div className="rounded-xl border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 border-b">
-              <tr>
-                <th className="text-left p-3 font-medium">Product</th>
-                <th className="text-left p-3 font-medium hidden sm:table-cell">Category</th>
-                <th className="text-right p-3 font-medium">Price</th>
-                <th className="text-right p-3 font-medium">Stock</th>
-                <th className="text-center p-3 font-medium">Status</th>
-                <th className="text-center p-3 font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {filtered.map(product => {
-                const config = STATUS_CONFIG[product.status ?? 'DRAFT'] ?? STATUS_CONFIG.DRAFT;
-                const isLow     = product.stock <= 5 && product.stock > 0;
-                const isOut     = product.stock === 0;
-                const imageUrl  = product.primaryImageUrl
-                  ? `${API_BASE}${product.primaryImageUrl}` : null;
+        <>
+          <div className="rounded-xl border overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 border-b">
+                <tr>
+                  <th className="text-left p-3 font-medium">Product</th>
+                  <th className="text-left p-3 font-medium hidden sm:table-cell">Category</th>
+                  <th className="text-right p-3 font-medium">Price</th>
+                  <th className="text-right p-3 font-medium">Stock</th>
+                  <th className="text-center p-3 font-medium">Status</th>
+                  <th className="text-center p-3 font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {paginated.map(product => {
+                  const config   = STATUS_CONFIG[product.status ?? 'DRAFT'] ?? STATUS_CONFIG.DRAFT;
+                  const isLow    = product.stock <= 5 && product.stock > 0;
+                  const isOut    = product.stock === 0;
+                  const imageUrl = product.primaryImageUrl
+                    ? `${API_BASE}${product.primaryImageUrl}` : null;
 
-                return (
-                  <tr key={product.id}
-                    className="hover:bg-muted/30 transition-colors">
+                  return (
+                    <tr key={product.id} className="hover:bg-muted/30 transition-colors">
 
-                    {/* Product */}
-                    <td className="p-3">
-                      <div className="flex items-center gap-3">
-                        <div className="relative h-12 w-12 rounded-lg overflow-hidden bg-muted shrink-0">
-                          {imageUrl ? (
-                            <Image src={imageUrl} alt={product.name} fill
-                              className="object-cover" sizes="48px"
-                              unoptimized={process.env.NODE_ENV === 'development'} />
-                          ) : (
-                            <div className="flex h-full items-center justify-center">
-                              <Package className="h-5 w-5 text-muted-foreground/30" />
-                            </div>
-                          )}
+                      {/* Product */}
+                      <td className="p-3">
+                        <div className="flex items-center gap-3">
+                          <div className="relative h-12 w-12 rounded-lg overflow-hidden bg-muted shrink-0">
+                            {imageUrl ? (
+                              <Image src={imageUrl} alt={product.name} fill
+                                className="object-cover" sizes="48px"
+                                unoptimized={process.env.NODE_ENV === 'development'} />
+                            ) : (
+                              <div className="flex h-full items-center justify-center">
+                                <Package className="h-5 w-5 text-muted-foreground/30" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-medium line-clamp-1">{product.name}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {product.hasVariants
+                                ? `${product.variants?.length ?? 0} variants`
+                                : 'No variants'
+                              }
+                            </p>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <p className="font-medium line-clamp-1">{product.name}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {product.hasVariants
-                              ? `${product.variants?.length ?? 0} variants`
-                              : 'No variants'
-                            }
-                          </p>
-                        </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Category */}
-                    <td className="p-3 hidden sm:table-cell text-muted-foreground">
-                      {product.categoryName ?? '—'}
-                    </td>
+                      {/* Category */}
+                      <td className="p-3 hidden sm:table-cell text-muted-foreground">
+                        {product.categoryName ?? '—'}
+                      </td>
 
-                    {/* Price */}
-                    <td className="p-3 text-right font-medium">
-                      ${product.price.toFixed(2)}
-                      {product.maxPrice && product.maxPrice !== product.price && (
-                        <span className="text-xs text-muted-foreground block">
-                          - ${product.maxPrice.toFixed(2)}
+                      {/* Price */}
+                      <td className="p-3 text-right font-medium">
+                        ${product.price.toFixed(2)}
+                        {product.maxPrice && product.maxPrice !== product.price && (
+                          <span className="text-xs text-muted-foreground block">
+                            – ${product.maxPrice.toFixed(2)}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Stock */}
+                      <td className="p-3 text-right">
+                        <span className={`font-medium ${
+                          isOut ? 'text-destructive'
+                            : isLow ? 'text-orange-500'
+                              : 'text-foreground'
+                        }`}>
+                          {product.stock}
                         </span>
-                      )}
-                    </td>
+                        {isOut && <span className="block text-xs text-destructive">Out</span>}
+                        {isLow && !isOut && <span className="block text-xs text-orange-500">Low</span>}
+                      </td>
 
-                    {/* Stock */}
-                    <td className="p-3 text-right">
-                      <span className={`font-medium ${
-                        isOut ? 'text-destructive'
-                          : isLow ? 'text-orange-500'
-                            : 'text-foreground'
-                      }`}>
-                        {product.stock}
-                      </span>
-                      {isOut && (
-                        <span className="block text-xs text-destructive">Out</span>
-                      )}
-                      {isLow && !isOut && (
-                        <span className="block text-xs text-orange-500">Low</span>
-                      )}
-                    </td>
+                      {/* Status */}
+                      <td className="p-3 text-center">
+                        <Badge className={`${config.color} border-0 text-xs`}>
+                          {config.label}
+                        </Badge>
+                      </td>
 
-                    {/* Status */}
-                    <td className="p-3 text-center">
-                      <Badge className={`${config.color} border-0 text-xs`}>
-                        {config.label}
-                      </Badge>
-                    </td>
+                      {/* Actions */}
+                      <td className="p-3 text-center">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Link href={`/vendor/products/${product.id}`}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setEditProduct(product)}>
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleToggleStatus(product)}>
+                              {product.status === 'ACTIVE'
+                                ? <><ToggleLeft className="h-4 w-4 mr-2" />Pause</>
+                                : <><ToggleRight className="h-4 w-4 mr-2" />Activate</>
+                              }
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => setDeleteId(product.id)}
+                              className="text-destructive focus:text-destructive">
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
 
-                    {/* Actions */}
-                    <td className="p-3 text-center">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link href={`/vendor/products/${product.id}`}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setEditProduct(product)}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleToggleStatus(product)}>
-                            {product.status === 'ACTIVE'
-                              ? <><ToggleLeft className="h-4 w-4 mr-2" />Pause</>
-                              : <><ToggleRight className="h-4 w-4 mr-2" />Activate</>
-                            }
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={() => setDeleteId(product.id)}
-                            className="text-destructive focus:text-destructive">
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-sm text-muted-foreground">
+                Showing {safePage * PAGE_SIZE + 1}–{Math.min((safePage + 1) * PAGE_SIZE, filtered.length)} of {filtered.length} products
+              </p>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline" size="sm"
+                  disabled={safePage === 0}
+                  onClick={() => setPage(p => p - 1)}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Prev
+                </Button>
+
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }).map((_, i) => {
+                    const show         = i === 0 || i === totalPages - 1 || Math.abs(i - safePage) <= 1;
+                    const showEllipsis = !show && (i === 1 || i === totalPages - 2);
+                    if (showEllipsis) return (
+                      <span key={i} className="px-1 text-muted-foreground text-sm">…</span>
+                    );
+                    if (!show) return null;
+                    return (
+                      <Button
+                        key={i}
+                        variant={safePage === i ? 'default' : 'outline'}
+                        size="sm"
+                        className="w-9 h-9"
+                        onClick={() => setPage(i)}
+                      >
+                        {i + 1}
+                      </Button>
+                    );
+                  })}
+                </div>
+
+                <Button
+                  variant="outline" size="sm"
+                  disabled={safePage >= totalPages - 1}
+                  onClick={() => setPage(p => p + 1)}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Delete confirmation */}

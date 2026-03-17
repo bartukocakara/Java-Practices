@@ -16,9 +16,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CartService {
 
-    private final CartRepository cartRepository;
-    private final ProductRepository productRepository;
-    private final UserRepository userRepository;
+    private final CartRepository           cartRepository;
+    private final ProductRepository        productRepository;
+    private final UserRepository           userRepository;
+    private final ProductVariantRepository variantRepository;
 
     public CartResponse getCart(String username) {
         User user = findUser(username);
@@ -30,24 +31,60 @@ public class CartService {
     @Transactional
     public CartResponse addItem(String username, CartItemRequest request) {
         User user = findUser(username);
-        Product product = productRepository.findById(request.productId())
-            .orElseThrow(() -> new ResourceNotFoundException("Product", request.productId()));
 
-        if (product.getStock() < request.quantity())
-            throw new IllegalArgumentException("Insufficient stock for: " + product.getName());
+        Product product = productRepository.findById(request.productId())
+            .orElseThrow(() -> new ResourceNotFoundException(
+                "Product", request.productId()));
+
+        // ── Stock check ──
+        ProductVariant variant = null;
+        if (request.variantId() != null) {
+            variant = variantRepository.findById(request.variantId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                    "Variant", request.variantId()));
+
+            if (!variant.getProduct().getId().equals(request.productId()))
+                throw new IllegalArgumentException(
+                    "Variant does not belong to this product");
+
+            if (variant.getStock() < request.quantity())
+                throw new IllegalArgumentException(
+                    "Insufficient stock for: " + product.getName()
+                    + " (" + variant.getDisplayLabel() + ")");
+        } else {
+            if (product.getStock() < request.quantity())
+                throw new IllegalArgumentException(
+                    "Insufficient stock for: " + product.getName());
+        }
 
         Cart cart = cartRepository.findByUserIdWithItems(user.getId())
             .orElseGet(() -> createEmptyCart(user));
 
-        // Update quantity if item already exists, otherwise add new
+        final ProductVariant finalVariant = variant;
+
+        // ── Check if same product+variant already in cart ──
         cart.getItems().stream()
-            .filter(i -> i.getProduct().getId().equals(request.productId()))
+            .filter(i -> i.getProduct().getId().equals(request.productId())
+                && variantMatches(i.getVariant(), finalVariant))
             .findFirst()
             .ifPresentOrElse(
-                existing -> existing.setQuantity(existing.getQuantity() + request.quantity()),
+                existing -> {
+                    int newQty = existing.getQuantity() + request.quantity();
+                    int availableStock = finalVariant != null
+                        ? finalVariant.getStock()
+                        : product.getStock();
+
+                    if (newQty > availableStock)
+                        throw new IllegalArgumentException(
+                            "Cannot add " + request.quantity() + " more — only "
+                            + availableStock + " in stock");
+
+                    existing.setQuantity(newQty);
+                },
                 () -> cart.getItems().add(CartItem.builder()
                     .cart(cart)
                     .product(product)
+                    .variant(finalVariant)
                     .quantity(request.quantity())
                     .build())
             );
@@ -67,8 +104,15 @@ public class CartService {
         if (quantity <= 0) {
             cart.getItems().remove(item);
         } else {
-            if (item.getProduct().getStock() < quantity)
-                throw new IllegalArgumentException("Insufficient stock");
+            // ── Check variant stock or product stock ──
+            int availableStock = item.getVariant() != null
+                ? item.getVariant().getStock()
+                : item.getProduct().getStock();
+
+            if (availableStock < quantity)
+                throw new IllegalArgumentException(
+                    "Insufficient stock — only " + availableStock + " available");
+
             item.setQuantity(quantity);
         }
 
@@ -89,7 +133,13 @@ public class CartService {
         cartRepository.save(cart);
     }
 
-    // --- Helpers ---
+    // ── Helpers ──
+
+    private boolean variantMatches(ProductVariant a, ProductVariant b) {
+        if (a == null && b == null) return true;
+        if (a == null || b == null) return false;
+        return a.getId().equals(b.getId());
+    }
 
     private Cart createEmptyCart(User user) {
         return cartRepository.save(Cart.builder().user(user).build());
@@ -98,7 +148,8 @@ public class CartService {
     private Cart getCartForUser(String username) {
         User user = findUser(username);
         return cartRepository.findByUserIdWithItems(user.getId())
-            .orElseThrow(() -> new ResourceNotFoundException("Cart", user.getId()));
+            .orElseThrow(() -> new ResourceNotFoundException(
+                "Cart", user.getId()));
     }
 
     private User findUser(String username) {
@@ -108,19 +159,31 @@ public class CartService {
 
     private CartResponse toResponse(Cart cart) {
         List<CartResponse.CartItemResponse> itemResponses = cart.getItems().stream()
-            .map(i -> new CartResponse.CartItemResponse(
-                i.getId(),
-                i.getProduct().getId(),
-                i.getProduct().getName(),
-                i.getProduct().getPrice(),
-                i.getQuantity(),
-                i.getProduct().getPrice().multiply(BigDecimal.valueOf(i.getQuantity()))
-            )).toList();
+            .map(this::toItemResponse)
+            .toList();
 
         BigDecimal total = itemResponses.stream()
             .map(CartResponse.CartItemResponse::subtotal)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         return new CartResponse(cart.getId(), itemResponses, total);
+    }
+
+    private CartResponse.CartItemResponse toItemResponse(CartItem item) {
+        // Use variant price if variant exists, otherwise product price
+        BigDecimal price = item.getVariant() != null
+            ? item.getVariant().getPrice()
+            : item.getProduct().getPrice();
+
+        return new CartResponse.CartItemResponse(
+            item.getId(),
+            item.getProduct().getId(),
+            item.getVariant() != null ? item.getVariant().getId() : null,
+            item.getProduct().getName(),
+            item.getVariant() != null ? item.getVariant().getDisplayLabel() : null,
+            price,
+            item.getQuantity(),
+            price.multiply(BigDecimal.valueOf(item.getQuantity()))
+        );
     }
 }

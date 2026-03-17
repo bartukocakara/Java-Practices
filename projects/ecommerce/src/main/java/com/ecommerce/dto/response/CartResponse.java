@@ -9,11 +9,13 @@ public record CartResponse(
     BigDecimal totalAmount
 ) {
     public record CartItemResponse(
-        Long cartItemId,
-        Long productId,
-        String productName,
+        Long       cartItemId,
+        Long       productId,
+        Long       variantId,     // ← add
+        String     productName,
+        String     variantLabel,  // ← add e.g. "38 / Black"
         BigDecimal unitPrice,
-        Integer quantity,
+        Integer    quantity,
         BigDecimal subtotal
     ) {}
 }

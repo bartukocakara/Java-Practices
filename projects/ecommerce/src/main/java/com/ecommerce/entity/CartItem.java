@@ -5,7 +5,10 @@ import lombok.*;
 
 @Entity
 @Table(name = "cart_items",
-    uniqueConstraints = @UniqueConstraint(columnNames = {"cart_id", "product_id"}))
+    uniqueConstraints = @UniqueConstraint(
+        name = "uq_cart_product_variant",
+        columnNames = {"cart_id", "product_id", "variant_id"}  // ← include variant_id
+    ))
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class CartItem {
 
@@ -20,6 +23,10 @@ public class CartItem {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "variant_id")
+    private ProductVariant variant;
 
     @Column(nullable = false)
     private Integer quantity;
