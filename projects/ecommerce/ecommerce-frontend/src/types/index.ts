@@ -68,6 +68,8 @@ export interface Product {
   variants?: ProductVariantResponse[];
   hasVariants: boolean;
   slug: string;
+  status?: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'DELETED'; // ← add this
+  createdAt?: string;                                    // ← add this too
 }
 
 export interface PageResponse<T> {

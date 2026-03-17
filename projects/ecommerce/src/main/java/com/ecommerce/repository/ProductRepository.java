@@ -146,4 +146,6 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
         WHERE p.id = :id
         """)
     Optional<Product> findByIdWithImages(@Param("id") Long id);
+
+    List<Product> findByVendorIdOrderByCreatedAtDesc(Long vendorId);
 }
