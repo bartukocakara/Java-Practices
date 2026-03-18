@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Order> findByUserIdOrderByCreatedAtDesc(Long userId);
@@ -23,4 +24,12 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
         @Param("status")    Order.Status status,
         @Param("productId") Long productId
     );
+
+    @Query("""
+        SELECT o FROM Order o
+        LEFT JOIN FETCH o.items i
+        LEFT JOIN FETCH i.product
+        WHERE o.id = :id
+        """)
+    Optional<Order> findByIdWithItems(@Param("id") Long id);
 }

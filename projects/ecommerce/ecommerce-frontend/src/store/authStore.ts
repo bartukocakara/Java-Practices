@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Role } from '@/types';
 import Cookies from 'js-cookie';
+import { useStore } from 'zustand';
 
 interface AuthState {
   token:           string | null;
@@ -57,3 +58,6 @@ export const useAuthStore = create<AuthState>()(
     { name: 'auth-storage' }
   )
 );
+
+export const useAuthStoreHydrated = () =>
+  useAuthStore.persist.hasHydrated();

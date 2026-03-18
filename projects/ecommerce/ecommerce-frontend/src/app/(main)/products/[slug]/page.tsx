@@ -8,6 +8,7 @@ import {
   ShoppingCart, Star, StarHalf, Package,
   Truck, Shield, RefreshCw, Plus, Minus, Heart,
   ChevronRight, AlertTriangle,
+  Store,
 } from 'lucide-react';
 import { Button }    from '@/components/ui/button';
 import { Badge }     from '@/components/ui/badge';
@@ -312,17 +313,29 @@ function ProductDetailContent({ slug }: { slug: string }) {
             </div>
           )}
         </div>
-
         {/* ── Product Info ── */}
         <div className="space-y-5 lg:py-2">
-
           {/* Badges */}
           <div className="flex items-center gap-2 flex-wrap">
             {product.categoryName && (
-              <Badge variant="outline" className="font-normal">{product.categoryName}</Badge>
+              <Badge variant="outline" className="font-normal">
+                {product.categoryName}
+              </Badge>
             )}
             {(!hasVariants || selectedVariant) && (
               <StockBadge stock={effectiveStock} isOutOfStock={isOutOfStock} />
+            )}
+            {/* Vendor badge — links to public store page */}
+            {product.vendorSlug && (
+              <Link href={`/vendors/${product.vendorSlug}`}>
+                <Badge
+                  variant="secondary"
+                  className="flex items-center gap-1.5 cursor-pointer hover:bg-secondary/80 transition-colors"
+                >
+                  <Store className="h-3 w-3" />
+                  {product.vendorName ?? 'View Store'}
+                </Badge>
+              </Link>
             )}
           </div>
 

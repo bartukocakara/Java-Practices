@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
@@ -50,7 +50,8 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 export default function ProfilePage() {
   const router  = useRouter();
   const { username, role, logout, isAuthenticated } = useAuthStore();
-
+  const [hydrated, setHydrated] = useState(false);
+  
   const { data: orders    = [] } = useMyOrders();
   const { data: addresses = [] } = useAddresses();
   const { data: cart }           = useCart();
@@ -68,6 +69,16 @@ export default function ProfilePage() {
     formState: { errors },
   } = useForm<PasswordForm>({ resolver: zodResolver(passwordSchema) });
 
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    // your redirect logic here
+  }, [hydrated, isAuthenticated]);
+
+  if (!hydrated) return null;
   const newPassword = watch('newPassword', '');
   const strength = [
     newPassword.length >= 8,

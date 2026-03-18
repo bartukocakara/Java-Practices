@@ -3,8 +3,11 @@ package com.ecommerce.service;
 import com.ecommerce.dto.request.*;
 import com.ecommerce.dto.response.AuthResponse;
 import com.ecommerce.entity.User;
+import com.ecommerce.exception.ResourceNotFoundException;
 import com.ecommerce.repository.UserRepository;
 import com.ecommerce.security.JwtService;
+
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.*;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -49,5 +52,19 @@ public class AuthService {
         String token = jwtService.generateToken(userDetails);
         User user = userRepository.findByUsername(request.username()).orElseThrow();
         return new AuthResponse(token, user.getUsername(), user.getRole().name());
+    }
+
+    @Transactional
+    public void changePassword(String username,
+                                String currentPassword,
+                                String newPassword) {
+        User user = userRepository.findByUsername(username)
+            .orElseThrow(() -> new ResourceNotFoundException("User", 0L));
+
+        if (!passwordEncoder.matches(currentPassword, user.getPassword()))
+            throw new BadCredentialsException("Current password is incorrect");
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
     }
 }

@@ -21,6 +21,7 @@ import java.util.List;
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final VendorRepository vendorRepository;
     private final CategoryRepository categoryRepository;
     private final SlugService         slugService;
     private final ProductVariantService variantService;
@@ -145,7 +146,21 @@ public class ProductService {
     }
 
     private ProductResponse toResponse(Product p) {
+        String vendorName = null;
+        String vendorSlug = null;
+        Long   vendorId   = p.getVendorId();
 
+        if (vendorId != null) {
+            vendorRepository.findById(vendorId).ifPresent(v -> {
+                // Can't set local vars from lambda — use array trick
+            });
+            // Better approach:
+            var vendor = vendorRepository.findById(vendorId).orElse(null);
+            if (vendor != null) {
+                vendorName = vendor.getStoreName();
+                vendorSlug = vendor.getStoreSlug();
+            }
+        }
         List<ProductImageResponse> images = p.getImages() == null
             ? List.of()
             : p.getImages().stream()
@@ -178,23 +193,15 @@ public class ProductService {
             : variants.stream().mapToInt(ProductVariantResponse::stock).sum();
 
         return new ProductResponse(
-            p.getId(),
-            p.getName(),
-            p.getDescription(),
-            basePrice,
-            maxPrice,
-            totalStock,
+            p.getId(), p.getName(), p.getDescription(),
+            basePrice, maxPrice, totalStock,
             p.getCategory() != null ? p.getCategory().getName() : null,
-            null,
-            null,
-            null,
-            p.getAverageRating(),
-            p.getReviewCount(),
-            p.getPrimaryImageUrl(),
-            images,
-            variants,
-            p.getSlug(),
-            !variants.isEmpty()
+            vendorId,
+            vendorName,   // ← was null before
+            vendorSlug,   // ← was null before
+            p.getAverageRating(), p.getReviewCount(),
+            p.getPrimaryImageUrl(), images, variants,
+            p.getSlug(), !variants.isEmpty()
         );
     }
 }

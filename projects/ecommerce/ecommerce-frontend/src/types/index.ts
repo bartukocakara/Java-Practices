@@ -100,29 +100,29 @@ export interface Cart {
 }
 
 export interface OrderItemResponse {
-  id: number;
-  productId: number;
+  id:          number;
+  productId:   number;
   productName: string;
-  variantId?: number;
+  variantId?:  number;
   variantInfo?: Record<string, string>;
-  quantity: number;
-  unitPrice: number;
-  subtotal: number;
+  quantity:    number;
+  unitPrice:   number;
+  subtotal:    number;
 }
 
 export interface Order {
-  id: number;
-  status: OrderStatus;
+  id:            number;
+  status:        OrderStatus;
   paymentMethod: PaymentMethod;
-  totalAmount: number;
-  fullName: string;
-  phone: string;
-  addressLine: string;
-  city: string;
-  country: string;
-  notes?: string;
-  items: OrderItemResponse[];
-  createdAt: string;
+  totalAmount:   number;
+  fullName:      string;
+  phone:         string;
+  addressLine:   string;
+  city:          string;
+  country:       string;
+  notes?:        string;
+  items:         OrderItemResponse[];
+  createdAt:     string;
 }
 
 export interface Review {

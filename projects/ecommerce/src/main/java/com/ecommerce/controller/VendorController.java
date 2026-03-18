@@ -1,6 +1,7 @@
 package com.ecommerce.controller;
 
 import com.ecommerce.dto.request.ReviewApplicationRequest;
+import com.ecommerce.dto.request.UpdateStoreRequest;
 import com.ecommerce.dto.request.VendorApplicationRequest;
 import com.ecommerce.dto.response.*;
 import com.ecommerce.service.VendorService;
@@ -13,6 +14,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -100,5 +102,49 @@ public class VendorController {
             @PathVariable Long id,
             @RequestParam String status) {
         return ResponseEntity.ok(vendorService.updateStatus(id, status));
+    }
+
+    @PutMapping("/api/vendor/store")
+    @PreAuthorize("hasRole('VENDOR') or hasRole('ADMIN')")
+    public ResponseEntity<VendorResponse> updateStore(
+            @AuthenticationPrincipal UserDetails user,
+            @Valid @RequestBody UpdateStoreRequest request) {
+        return ResponseEntity.ok(
+            vendorService.updateStore(user.getUsername(), request));
+    }
+
+    // ── Upload logo ──
+    @PostMapping("/api/vendor/store/logo")
+    @PreAuthorize("hasRole('VENDOR') or hasRole('ADMIN')")
+    public ResponseEntity<VendorResponse> uploadLogo(
+            @AuthenticationPrincipal UserDetails user,
+            @RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(
+            vendorService.uploadLogo(user.getUsername(), file));
+    }
+
+    // ── Upload banner ──
+    @PostMapping("/api/vendor/store/banner")
+    @PreAuthorize("hasRole('VENDOR') or hasRole('ADMIN')")
+    public ResponseEntity<VendorResponse> uploadBanner(
+            @AuthenticationPrincipal UserDetails user,
+            @RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(
+            vendorService.uploadBanner(user.getUsername(), file));
+    }
+
+    @GetMapping("/api/vendors/{slug}")
+    public ResponseEntity<VendorResponse> getPublicVendor(
+            @PathVariable String slug) {
+        return ResponseEntity.ok(vendorService.getPublicVendor(slug));
+    }
+
+    @GetMapping("/api/vendors/{slug}/products")
+    public ResponseEntity<List<ProductResponse>> getVendorProducts(
+            @PathVariable String slug,
+            @RequestParam(defaultValue = "0")  int page,
+            @RequestParam(defaultValue = "12") int size) {
+        return ResponseEntity.ok(
+            vendorService.getPublicVendorProducts(slug, page, size));
     }
 }

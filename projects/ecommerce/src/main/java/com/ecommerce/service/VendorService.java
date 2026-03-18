@@ -1,6 +1,7 @@
 package com.ecommerce.service;
 
 import com.ecommerce.dto.request.ReviewApplicationRequest;
+import com.ecommerce.dto.request.UpdateStoreRequest;
 import com.ecommerce.dto.request.VendorApplicationRequest;
 import com.ecommerce.dto.response.*;
 import com.ecommerce.entity.*;
@@ -11,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -22,13 +24,13 @@ import java.util.List;
 @Slf4j
 public class VendorService {
 
-    private final VendorRepository            vendorRepository;
-    private final VendorApplicationRepository applicationRepository;
-    private final UserRepository              userRepository;
-    private final OrderRepository             orderRepository;
-    private final ProductRepository           productRepository;
-    private final SlugService                 slugService;
-
+    private final VendorRepository              vendorRepository;
+    private final VendorApplicationRepository   applicationRepository;
+    private final UserRepository                userRepository;
+    private final OrderRepository               orderRepository;
+    private final ProductRepository             productRepository;
+    private final SlugService                   slugService;
+    private final FileStorageService            fileStorageService;
     // ── Application flow ──
 
     @Transactional
@@ -326,6 +328,95 @@ public class VendorService {
             o.getNotes(),
             List.of(),
             o.getCreatedAt()
+        );
+    }
+
+    @Transactional
+    public VendorResponse updateStore(String username,
+                                    UpdateStoreRequest request) {
+        Vendor vendor = findVendorByUsername(username);
+
+        vendor.setStoreName(request.storeName());
+        vendor.setDescription(request.description());
+        vendor.setEmail(request.email());
+        vendor.setPhone(request.phone());
+        vendor.setAddress(request.address());
+
+        return toVendorResponse(vendorRepository.save(vendor));
+    }
+
+    @Transactional
+    public VendorResponse uploadLogo(String username, MultipartFile file) {
+        Vendor vendor   = findVendorByUsername(username);
+        String imageUrl = fileStorageService.store(file, "vendors");
+        vendor.setLogoUrl(imageUrl);
+        return toVendorResponse(vendorRepository.save(vendor));
+    }
+
+    @Transactional
+    public VendorResponse uploadBanner(String username, MultipartFile file) {
+        Vendor vendor   = findVendorByUsername(username);
+        String imageUrl = fileStorageService.store(file, "vendors");
+        vendor.setBannerUrl(imageUrl);
+        return toVendorResponse(vendorRepository.save(vendor));
+    }
+
+    private Vendor findVendorByUsername(String username) {
+        return userRepository.findByUsername(username)
+            .map(u -> vendorRepository.findByUserId(u.getId())
+                .orElseThrow(() -> new AccessDeniedException("Not a vendor")))
+            .orElseThrow(() -> new ResourceNotFoundException("User", 0L));
+    }
+
+    public VendorResponse getPublicVendor(String slug) {
+        Vendor vendor = vendorRepository.findByStoreSlug(slug)
+            .orElseThrow(() -> new ResourceNotFoundException("Vendor", 0L));
+        return toVendorResponse(vendor);
+    }
+
+    public List<ProductResponse> getPublicVendorProducts(String slug,
+                                                      int page,
+                                                      int size) {
+        Vendor vendor = vendorRepository.findByStoreSlug(slug)
+            .orElseThrow(() -> new ResourceNotFoundException("Vendor", 0L));
+
+        return productRepository
+            .findByVendorIdOrderByCreatedAtDesc(vendor.getId())
+            .stream()
+            .filter(p -> p.getStatus().equals("ACTIVE"))
+            .skip((long) page * size)
+            .limit(size)
+            .map(p -> toProductResponse(p, vendor))  // ← pass vendor here
+            .toList();
+    }
+
+    // Simple product response mapper for vendor context
+    private ProductResponse toProductResponse(Product p, Vendor vendor) {
+        String primaryImage = p.getImages() == null ? null : p.getImages()
+            .stream()
+            .filter(ProductImage::getIsPrimary)
+            .findFirst()
+            .map(ProductImage::getImageUrl)
+            .orElse(null);
+
+        return new ProductResponse(
+            p.getId(),
+            p.getName(),
+            p.getDescription(),
+            p.getBasePrice() != null ? p.getBasePrice() : p.getPrice(),
+            null,
+            p.getStock(),
+            p.getCategory() != null ? p.getCategory().getName() : null,
+            vendor.getId(),
+            vendor.getStoreName(),
+            vendor.getStoreSlug(),
+            p.getAverageRating(),
+            p.getReviewCount(),
+            primaryImage,
+            List.of(),
+            List.of(),
+            p.getSlug(),
+            false
         );
     }
 }

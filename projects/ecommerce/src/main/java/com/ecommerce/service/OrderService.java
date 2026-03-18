@@ -1,6 +1,7 @@
 package com.ecommerce.service;
 
 import com.ecommerce.dto.request.OrderRequest;
+import com.ecommerce.dto.response.OrderItemResponse;
 import com.ecommerce.dto.response.OrderResponse;
 import com.ecommerce.entity.*;
 import com.ecommerce.exception.ResourceNotFoundException;
@@ -114,14 +115,18 @@ public class OrderService {
     }
 
     private OrderResponse toResponse(Order o) {
-        List<OrderResponse.OrderItemResponse> items = o.getItems().stream()
-            .map(i -> new OrderResponse.OrderItemResponse(
+        List<OrderItemResponse> items = o.getItems().stream()
+            .map(i -> new OrderItemResponse(
                 i.getId(),
                 i.getProduct().getId(),
-                i.getProduct().getName(),
+                i.getProductName() != null
+                    ? i.getProductName()
+                    : i.getProduct().getName(),
+                i.getVariant() != null ? i.getVariant().getId() : null,
+                i.getVariantInfo(),
                 i.getQuantity(),
                 i.getUnitPrice(),
-                i.getUnitPrice().multiply(BigDecimal.valueOf(i.getQuantity())) // ← subtotal
+                i.getUnitPrice().multiply(BigDecimal.valueOf(i.getQuantity()))
             )).toList();
 
         return new OrderResponse(
